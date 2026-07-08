@@ -14,7 +14,9 @@
 
 ## 概述
 
-backend 是 [sfc-ext-ai-assistant](https://github.com/philipxiaoxi/sfc-ext-ai-assistant) 的后端模块，作为咸鱼云平台的一个扩展插件（jar），提供基于 SSE（Server-Sent Events）的流式 AI 对话能力。
+该项目为 sfc-ext-ai 插件的后端模块，作为咸鱼云平台的一个扩展插件（jar），提供基于 SSE（Server-Sent Events）的流式 AI 对话能力。
+
+该项目的开发与构建需要基于 [咸鱼云网盘后端](https://github.com/mjt233/saltedfishcloud-backend) 项目下。
 
 ## 前置要求
 
@@ -22,17 +24,37 @@ backend 是 [sfc-ext-ai-assistant](https://github.com/philipxiaoxi/sfc-ext-ai-as
 - Maven 3.9+
 - 咸鱼云 3.1.2+
 
-## 构建
+## 配置开发与构建环境
 
-```bash
-mvn package -DskipTests
-```
+1. 拉取咸鱼云网盘后端项目
+   ```bash
+   git clone https://github.com/mjt233/saltedfishcloud-backend.git
+   ```
 
-产物位于 `target/sfc-ext-ai-assistant-1.0.0.jar`。
+2. 在咸鱼云网盘后端的 `sfc-ext` 目录下拉取本项目到 `sfc-ext-ai`
+   ```bash
+   cd saltedfishcloud-backend/sfc-ext &&
+   git clone https://github.com/philipxiaoxi/sfc-ext-ai-backend.git sfc-ext-ai
+   ```
 
-## 安装
+3. 设置 Maven profile 为 `develop`，或指定 SpringBoot 配置文件为 `sfc-core/src/main/config/application-develop.yml`
 
-将 jar 放入咸鱼云的 `plugins/` 目录，重启服务即可。
+4. 修改 `application-develop.yml`，在 `plugin.extra-resource` 中添加一项：
+   ```yaml
+   plugin:
+     extra-resource:
+       - sfc-ext/sfc-ext-ai
+   ```
+
+5. 如果插件存在第三方依赖，请在 `sfc-ext/sfc-ext-ai` 目录执行 `mvn compile` 确保依赖库得到加载，然后在 IDE 中刷新依赖信息以便后续能使用 `build_project` 进行验证。
+
+6. 打包构建：在 `sfc-ext` 目录执行
+   ```bash
+   mvn clean package
+   ```
+   构建完成后，插件 jar 包会生成在 `release/ext-available/` 目录下。
+
+7. 安装：将 jar 包复制到咸鱼云程序运行路径下的 `ext/`，重启服务即可。
 
 ## API
 
@@ -52,7 +74,7 @@ mvn package -DskipTests
 backend
 ├── pom.xml
 └── src/main
-    ├── java/com/sfc/aiassistant
+    ├── java/com/sfc/ai
     │   ├── AiAssistantAutoConfiguration.java    # 自动配置
     │   ├── controller/AiAssistantController.java # SSE 聊天接口
     │   └── model/ChatRequest.java               # 请求体
