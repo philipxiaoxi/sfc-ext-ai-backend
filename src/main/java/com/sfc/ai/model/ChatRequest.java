@@ -1,4 +1,4 @@
-package com.sfc.aiassistant.model;
+package com.sfc.ai.model;
 
 import lombok.Data;
 

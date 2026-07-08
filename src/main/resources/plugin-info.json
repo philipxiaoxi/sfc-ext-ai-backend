@@ -1,11 +1,10 @@
 {
-  "name": "ai-assistant",
+  "name": "sfc-ai",
   "alias": "AI助手",
-  "describe": "右下角AI对话助手",
+  "describe": "提供云端Agent AI助手服务，支持多种AI模型接入，提供智能问答、文件整理等功能。",
   "loadType": "merge",
   "type": "jar",
-  "author": "philipxiaoxi",
+  "author": "philipxiaoxi, xiaotao233",
   "apiVersion": "3.1.2",
-  "version": "1.0.0",
-  "autoLoad": ["index.umd.js"]
+  "version": "1.0.0"
 }

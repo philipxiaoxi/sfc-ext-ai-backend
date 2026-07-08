@@ -1,6 +1,6 @@
-package com.sfc.aiassistant.controller;
+package com.sfc.ai.controller;
 
-import com.sfc.aiassistant.model.ChatRequest;
+import com.sfc.ai.model.ChatRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
@@ -52,20 +52,30 @@ public class AiAssistantController {
         response.setHeader("X-Accel-Buffering", "no");
         SseEmitter emitter = new SseEmitter(120000L);
 
-        String reply = "##   👋 你好，我是咸鱼云 AI 助手！\n\n"
-                + "很高兴为你服务！我目前处于**内测阶段**，这是一个流式返回的演示消息。\n\n"
-                + "### 🚀 我能做什么？\n\n"
-                + "- 📂 **文件管理**：帮你查找、整理网盘中的文件\n"
-                + "- 🔍 **智能搜索**：通过自然语言快速定位你想要的内容\n"
-                + "- 📊 **信息汇总**：对文档内容进行摘要和分析\n"
-                + "- 🛠️ **快捷操作**：一键执行常用任务\n\n"
-                + "### 📌 使用提示\n\n"
-                + "> 当前为演示版本，后端返回的是固定 Markdown 内容。\n"
-                + "> 正式版将接入 AI 大模型，支持真正的对话交互。\n\n"
-                + "你可以尝试输入任意文字，我会逐字打印这段 Markdown，\n"
-                + "前端使用 **markdown-it** 进行渲染，支持标题、列表、引用等格式。\n\n"
-                + "---\n\n"
-                + "😊 敬请期待更多功能上线！";
+        String reply = """
+                ##   👋 你好，我是咸鱼云 AI 助手！
+                
+                很高兴为你服务！我目前处于**内测阶段**，这是一个流式返回的演示消息。
+                
+                ### 🚀 我能做什么？
+                
+                - 📂 **文件管理**：帮你查找、整理网盘中的文件
+                - 🔍 **智能搜索**：通过自然语言快速定位你想要的内容
+                - 📊 **信息汇总**：对文档内容进行摘要和分析
+                - 🛠️ **快捷操作**：一键执行常用任务
+                
+                ### 📌 使用提示
+                
+                > 当前为演示版本，后端返回的是固定 Markdown 内容。
+                > 正式版将接入 AI 大模型，支持真正的对话交互。
+                
+                你可以尝试输入任意文字，我会逐字打印这段 Markdown，
+                前端使用 **markdown-it** 进行渲染，支持标题、列表、引用等格式。
+                
+                ---
+                
+                😊 敬请期待更多功能上线！
+                """;
 
         emitter.onCompletion(() -> log.info("AI 助手 SSE 连接结束"));
         emitter.onTimeout(() -> {
