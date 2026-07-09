@@ -35,16 +35,10 @@
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-reflect</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.xiaotao</groupId>
-            <artifactId>sfc-core</artifactId>
-            <version>${revision}</version>
-            <scope>provided</scope>
-        </dependency>
     </dependencies>
 
     <dependencyManagement>
-        <dependencies>
+    <dependencies>
             <dependency>
                 <groupId>org.springframework.ai</groupId>
                 <artifactId>spring-ai-bom</artifactId>
@@ -52,6 +46,43 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <dependency>
+                <groupId>com.xiaotao</groupId>
+                <artifactId>sfc-core</artifactId>
+                <version>${revision}</version>
+                <scope>provided</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-dependencies</id>
+                        <configuration>
+                            <!-- 宿主 sfc-core 已提供的依赖，无需打包到 plugin-lib -->
+                            <excludeGroupIds>com.fasterxml.jackson.core,com.fasterxml.jackson.datatype,com.fasterxml.jackson.dataformat,com.fasterxml.jackson.module</excludeGroupIds>
+                            <excludeArtifactIds>
+                                spring-boot-starter-jackson,
+                                spring-boot-jackson,
+                                jackson-core,
+                                jackson-databind,
+                                kotlin-stdlib,
+                                jspecify,
+                                micrometer-commons,
+                                micrometer-observation,
+                                antlr4-runtime,
+                                error_prone_annotations,
+                                swagger-annotations-jakarta
+                            </excludeArtifactIds>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>
