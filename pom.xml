@@ -20,23 +20,20 @@
     </properties>
 
     <dependencies>
+        <!-- 核心 OpenAI 模型支持（不包含自动配置，用户将手动构造客户端） -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-starter-model-openai</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-webclient</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-restclient</artifactId>
-                </exclusion>
-            </exclusions>
+            <artifactId>spring-ai-openai</artifactId>
+        </dependency>
+        <!-- ChatClient 构建器 API -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-client-chat</artifactId>
+        </dependency>
+        <!-- openai-java-core 使用 Kotlin，需要 Kotlin 反射支持 -->
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-reflect</artifactId>
         </dependency>
         <dependency>
             <groupId>com.xiaotao</groupId>
