@@ -1,0 +1,19 @@
+[
+  {
+    "name": "llm-provider",
+    "title": "LLM提供商",
+    "nodes": [
+      {
+        "nodes": [
+          {
+            "name": "llm-provider-manager",
+            "title": "LLM提供商管理",
+            "inputType": "template",
+            "template": "llm-provider-manager",
+            "defaultValue": ""
+          }
+        ]
+      }
+    ]
+  }
+]

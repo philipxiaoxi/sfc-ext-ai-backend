@@ -1,6 +1,5 @@
 target/
 .flattened-pom.xml
-src/main/assert/static/
 
 .idea/
 .vscode/
