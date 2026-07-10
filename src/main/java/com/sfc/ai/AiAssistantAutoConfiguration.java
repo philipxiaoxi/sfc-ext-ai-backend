@@ -1,7 +1,6 @@
 package com.sfc.ai;
 
 import com.sfc.ai.config.AiWebSocketConfig;
-import com.sfc.ai.controller.AiAssistantController;
 import com.sfc.ai.controller.LlmModelController;
 import com.sfc.ai.controller.LlmProviderController;
 import com.sfc.ai.model.po.LlmModel;
@@ -13,7 +12,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 @Import({
-        AiAssistantController.class,
         LlmProviderController.class,
         LlmModelController.class,
         LlmProviderServiceImpl.class,
