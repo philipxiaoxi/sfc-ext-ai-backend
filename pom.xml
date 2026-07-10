@@ -77,7 +77,8 @@
                                 micrometer-observation,
                                 antlr4-runtime,
                                 error_prone_annotations,
-                                swagger-annotations-jakarta
+                                swagger-annotations-jakarta,
+                                kotlin-reflect
                             </excludeArtifactIds>
                         </configuration>
                     </execution>

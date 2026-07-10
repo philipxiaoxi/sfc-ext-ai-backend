@@ -9,4 +9,8 @@ import lombok.Data;
  */
 @Data
 public class StartSessionPayload {
+    /**
+     * 可选的会话 ID。若客户端传入则使用该值，否则由服务端生成 UUID。
+     */
+    private String sessionId;
 }

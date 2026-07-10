@@ -7,18 +7,30 @@ import com.sfc.ai.model.chat.message.UserRequest;
 import com.sfc.ai.model.chat.payload.ChatPayload;
 import com.sfc.ai.model.chat.payload.DonePayload;
 import com.sfc.ai.model.chat.payload.ErrorPayload;
+import com.sfc.ai.model.chat.payload.SessionAckPayload;
+import com.sfc.ai.model.chat.payload.StartSessionPayload;
 import com.sfc.ai.model.chat.payload.TextPayload;
 import com.sfc.ai.model.po.LlmModel;
+import com.sfc.ai.model.po.LlmProvider;
+import com.sfc.ai.service.ChatClientService;
 import com.sfc.ai.service.LlmModelService;
+import com.sfc.ai.service.LlmProviderService;
 import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
 import com.xiaotao.saltedfishcloud.utils.MapperHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+import reactor.core.publisher.Flux;
+
+import java.io.IOException;
+import java.util.UUID;
 
 /**
  * AI 聊天 WebSocket 处理器。
@@ -33,11 +45,17 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 public class AiChatSocketHandler extends TextWebSocketHandler {
 
     private static final String SESSION_STARTED_KEY = "SESSION_STARTED";
+    private static final String SESSION_ID_KEY = "SESSION_ID";
 
     private final LlmModelService llmModelService;
+    private final ChatClientService chatClientService;
+    private final LlmProviderService llmProviderService;
 
-    public AiChatSocketHandler(LlmModelService llmModelService) {
+    public AiChatSocketHandler(LlmModelService llmModelService, ChatClientService chatClientService,
+                               LlmProviderService llmProviderService) {
         this.llmModelService = llmModelService;
+        this.chatClientService = chatClientService;
+        this.llmProviderService = llmProviderService;
     }
 
     @Override
@@ -75,6 +93,19 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
                 return;
             }
             markSessionStarted(session);
+
+            StartSessionPayload startPayload = MapperHolder.mapper.convertValue(userRequest.getData(), StartSessionPayload.class);
+            String sessionId = startPayload.getSessionId();
+            if (sessionId == null || sessionId.isBlank()) {
+                sessionId = UUID.randomUUID().toString();
+            }
+            session.getAttributes().put(SESSION_ID_KEY, sessionId);
+
+            SessionAckPayload ackPayload = new SessionAckPayload(sessionId);
+            LlmResponse response = new LlmResponse();
+            response.setType(LlmMessageType.SESSION_ACK);
+            response.setData(ackPayload);
+            session.sendMessage(new TextMessage(MapperHolder.toJson(response)));
             return;
         }
 
@@ -83,11 +114,16 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        switch (type) {
-            case CHAT -> handleChat(session, userRequest);
-            case TOOL_ACK -> handleToolAck(session, userRequest);
-            case STOP -> handleStop(session);
-            default -> sendError(session, "未知消息类型: " + type);
+        try {
+            switch (type) {
+                case CHAT -> handleChat(session, userRequest);
+                case TOOL_ACK -> handleToolAck(session, userRequest);
+                case STOP -> handleStop(session);
+                default -> sendError(session, "未知消息类型: " + type);
+            }
+        } catch (Throwable e) {
+            sendError(session, "处理消息时发生错误: " + e.getMessage());
+            log.error("处理 AI 消息时发生错误", e);
         }
     }
 
@@ -114,12 +150,53 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        TextPayload textPayload = new TextPayload();
-        textPayload.setContent("你好，我是" + model.getModelId() + "模型，有什么能帮助我吗？");
-        LlmResponse response = new LlmResponse();
-        response.setType(LlmMessageType.TEXT);
-        response.setData(textPayload);
-        session.sendMessage(new TextMessage(MapperHolder.toJson(response)));
+        LlmProvider provider = llmProviderService.findById(model.getLlmProviderId());
+        if (provider == null) {
+            sendError(session, "模型提供商不存在");
+            return;
+        }
+        String sessionId = (String) session.getAttributes().get(SESSION_ID_KEY);
+        ChatClient chatClient = chatClientService.getChatClient(provider, model, sessionId);
+        assert user != null;
+        chatClient.prompt(Prompt.builder()
+                        .messages(SystemMessage.builder()
+                                .text("你的咸鱼云网盘 AI 助手，可以帮助用户整理网盘、查找文件。当前用户用户名为: " + user.getUsername())
+                                .build())
+                        .build())
+                .user(chatData.getContent())
+                .stream()
+                .chatResponse()
+                .filter(msg -> !msg.getResults().isEmpty())
+                .flatMap(msg -> Flux.fromStream(msg.getResults().stream()))
+                .map(msg -> {
+                    String text = msg.getOutput().getText();
+                    TextPayload textPayload = new TextPayload();
+                    textPayload.setContent(text);
+                    LlmResponse response = new LlmResponse();
+                    response.setType(LlmMessageType.TEXT);
+                    response.setData(textPayload);
+                    return response;
+                })
+                .doOnError(throwable -> {
+                    try {
+                        sendError(session, "LLM 响应流处理过程中出错: " + throwable.getMessage());
+                    } catch (Exception e) {
+                        log.error("ai 消息发送出错", e);
+                    }
+                })
+                .subscribe(response -> {
+                    try {
+                        session.sendMessage(new TextMessage(MapperHolder.toJsonNoEx(response)));
+                    } catch (IOException e) {
+                        try {
+                            sendError(session, e.getMessage());
+                        } catch (Exception ex) {
+                            log.error("ai 消息发送出错", ex);
+                        }
+                    }
+                });
+
+
     }
 
     /**

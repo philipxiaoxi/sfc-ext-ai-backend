@@ -1,0 +1,4 @@
+logging:
+  level:
+    # 将消息聚合器的日志级别提高到 WARN 或 OFF，阻止其在控制台疯狂刷 ERROR
+    org.springframework.ai.chat.model.MessageAggregator: OFF

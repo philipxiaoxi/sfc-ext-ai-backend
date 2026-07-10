@@ -6,11 +6,11 @@ import com.sfc.ai.controller.LlmModelController;
 import com.sfc.ai.controller.LlmProviderController;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.repo.LlmModelRepo;
-import com.sfc.ai.service.LlmModelService;
+import com.sfc.ai.service.ChatClientService;
 import com.sfc.ai.service.impl.LlmModelServiceImpl;
 import com.sfc.ai.service.impl.LlmProviderServiceImpl;
+import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
@@ -19,14 +19,13 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
         LlmModelController.class,
         LlmProviderServiceImpl.class,
         LlmModelServiceImpl.class,
-        AiWebSocketConfig.class
+        ChatClientService.class,
+        AiWebSocketConfig.class,
+        AiChatSocketHandler.class,
+        InMemoryChatMemoryRepository.class
 })
 @EnableJpaRepositories(basePackageClasses = LlmModelRepo.class)
 @EntityScan(basePackageClasses = LlmModel.class)
 public class AiAutoConfiguration {
 
-    @Bean
-    public AiChatSocketHandler aiChatSocketHandler(LlmModelService llmModelService) {
-        return new AiChatSocketHandler(llmModelService);
-    }
 }
