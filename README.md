@@ -7,16 +7,16 @@
 </p>
 
 <p align="center">
-  咸鱼云 AI 助手后端插件 — Spring Boot 自动配置 + SSE 流式对话接口
+  咸鱼云 AI 助手后端插件 — WebSocket 流式对话 + 多模型/多提供商管理
 </p>
 
 ---
 
 ## 概述
 
-该项目为 sfc-ext-ai 插件的后端模块，作为咸鱼云平台的一个扩展插件（jar），提供基于 SSE（Server-Sent Events）的流式 AI 对话能力。
+该项目为 sfc-ext-ai 插件的后端模块，作为咸鱼云平台的一个扩展插件（jar），提供基于 **WebSocket** 的流式 AI 对话能力，以及提供商/模型的 REST CRUD 管理接口。
 
-该项目的开发与构建需要基于 [咸鱼云网盘后端](https://github.com/mjt233/saltedfishcloud-backend) 项目下。
+开发与构建需要基于 [咸鱼云网盘后端](https://github.com/mjt233/saltedfishcloud-backend) 项目。
 
 ## 前置要求
 
@@ -56,31 +56,98 @@
 
 7. 安装：将 jar 包复制到咸鱼云程序运行路径下的 `ext/`，重启服务即可。
 
-## API
 
-### POST /api/ai-assistant/chat
+## 协议
 
-请求体：
+### WebSocket 聊天
 
-```json
-{ "message": "你好" }
+**端点：** `ws://<host>/api/ai/wschat`
+
+详细协议定义参见 [docs/websocket-protocol.md](docs/websocket-protocol.md)。
+
+**基本流程：**
+
+```
+客户端 ──→ START_SESSION ──→ 服务端
+客户端 ←── SESSION_ACK ──── 服务端
+
+客户端 ──→ CHAT {modelId, content} ──→ 服务端
+客户端 ←── TEXT "流式片段" ────────── 服务端
+客户端 ←── TEXT "更多片段" ────────── 服务端
+客户端 ←── DONE ───────────────────── 服务端
 ```
 
-响应为 SSE 流，每行一个十进制 Unicode 码点，以 `[DONE]` 标记结束。
+### REST API
+
+**模型提供商管理：** `/api/ai/provider` — CRUD 管理 OpenAI/Anthropic 等提供商（API Key、Base URL 等）
+
+**模型管理：** `/api/ai/model` — CRUD 管理可用 AI 模型（关联提供商）
+
+## 技术栈
+
+| 技术 | 用途 |
+|------|------|
+| Java 25 + Maven 3.9+ | 开发/构建 |
+| Spring Boot + WebSocket | 框架 + 实时通信 |
+| Spring AI 2.0.0 | AI 模型集成（OpenAI 协议） |
+| Spring Data JPA | ORM 持久化 |
+| Project Reactor (Flux) | 流式响应 |
+| 咸鱼云 sfc-core (provided) | 基础平台依赖 |
 
 ## 项目结构
 
 ```
 backend
-├── pom.xml
+├── pom.xml                                           # Maven 构建（Spring AI 2.0.0）
+├── README.md
+├── LICENSE                                           # MIT
+├── docs/
+│   └── websocket-protocol.md                         # WebSocket 消息协议文档
+│
 └── src/main
-    ├── java/com/sfc/ai
-    │   ├── AiAssistantAutoConfiguration.java    # 自动配置
-    │   ├── controller/AiAssistantController.java # SSE 聊天接口
-    │   └── model/ChatRequest.java               # 请求体
-    └── resources
-        ├── META-INF/spring/                      # 自动配置注册
-        └── plugin-info.json                      # 插件元信息
+    ├── java/com/sfc/ai/
+    │   ├── AiAutoConfiguration.java                  # 自动配置入口
+    │   ├── config/
+    │   │   └── AiWebSocketConfig.java                # WebSocket 端点注册
+    │   ├── controller/
+    │   │   ├── AiChatSocketHandler.java              # WebSocket 聊天处理器（核心）
+    │   │   ├── LlmProviderController.java            # 提供商 REST CRUD
+    │   │   └── LlmModelController.java               # 模型 REST CRUD
+    │   ├── service/
+    │   │   ├── ChatClientService.java                # Spring AI ChatClient 构造
+    │   │   ├── LlmProviderService.java
+    │   │   ├── LlmModelService.java
+    │   │   └── impl/
+    │   │       ├── LlmProviderServiceImpl.java
+    │   │       └── LlmModelServiceImpl.java
+    │   ├── repo/
+    │   │   ├── LlmProviderRepo.java                  # JPA Repository
+    │   │   └── LlmModelRepo.java
+    │   ├── model/
+    │   │   ├── po/
+    │   │   │   ├── LlmProvider.java                  # 提供商实体
+    │   │   │   └── LlmModel.java                     # 模型实体
+    │   │   └── chat/
+    │   │       ├── message/
+    │   │       │   ├── UserRequest.java              # WebSocket 请求体
+    │   │       │   └── LlmResponse.java              # WebSocket 响应体
+    │   │       └── payload/
+    │   │           ├── ChatPayload.java
+    │   │           ├── StartSessionPayload.java
+    │   │           ├── SessionAckPayload.java
+    │   │           ├── TextPayload.java
+    │   │           ├── ErrorPayload.java
+    │   │           └── DonePayload.java
+    │   └── constant/
+    │       ├── UserMessageType.java                  # 客户端消息类型枚举
+    │       └── LlmMessageType.java                   # 服务端消息类型枚举
+    │
+    └── resources/
+        ├── application.yml                           # 日志配置
+        ├── plugin-info.json                          # 插件元信息
+        ├── config-properties.json                    # 管理后台配置面板
+        └── META-INF/spring/
+            └── AutoConfiguration.imports             # Spring Boot 自动配置注册
 ```
 
 ## License
