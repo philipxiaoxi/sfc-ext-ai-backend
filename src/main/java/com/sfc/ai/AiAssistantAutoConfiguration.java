@@ -1,5 +1,6 @@
 package com.sfc.ai;
 
+import com.sfc.ai.config.AiWebSocketConfig;
 import com.sfc.ai.controller.AiAssistantController;
 import com.sfc.ai.controller.LlmModelController;
 import com.sfc.ai.controller.LlmProviderController;
@@ -16,7 +17,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
         LlmProviderController.class,
         LlmModelController.class,
         LlmProviderServiceImpl.class,
-        LlmModelServiceImpl.class
+        LlmModelServiceImpl.class,
+        AiWebSocketConfig.class
 })
 @EnableJpaRepositories(basePackageClasses = LlmModelRepo.class)
 @EntityScan(basePackageClasses = LlmModel.class)
