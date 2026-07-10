@@ -1,7 +1,6 @@
 package com.sfc.ai.config;
 
 import com.sfc.ai.controller.AiChatSocketHandler;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
@@ -18,14 +17,15 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 @EnableWebSocket
 public class AiWebSocketConfig implements WebSocketConfigurer {
 
-    @Override
-    public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(echoWebSocketHandler(), "/api/ai/wschat")
-                .setAllowedOriginPatterns("*");
+    private final AiChatSocketHandler aiChatSocketHandler;
+
+    public AiWebSocketConfig(AiChatSocketHandler aiChatSocketHandler) {
+        this.aiChatSocketHandler = aiChatSocketHandler;
     }
 
-    @Bean
-    public AiChatSocketHandler echoWebSocketHandler() {
-        return new AiChatSocketHandler();
+    @Override
+    public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+        registry.addHandler(aiChatSocketHandler, "/api/ai/wschat")
+                .setAllowedOriginPatterns("*");
     }
 }

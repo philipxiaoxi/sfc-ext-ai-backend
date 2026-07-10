@@ -4,6 +4,12 @@ import com.sfc.ai.constant.LlmMessageType;
 import com.sfc.ai.constant.UserMessageType;
 import com.sfc.ai.model.chat.message.LlmResponse;
 import com.sfc.ai.model.chat.message.UserRequest;
+import com.sfc.ai.model.chat.payload.ChatPayload;
+import com.sfc.ai.model.chat.payload.DonePayload;
+import com.sfc.ai.model.chat.payload.ErrorPayload;
+import com.sfc.ai.model.chat.payload.TextPayload;
+import com.sfc.ai.model.po.LlmModel;
+import com.sfc.ai.service.LlmModelService;
 import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
 import com.xiaotao.saltedfishcloud.utils.MapperHolder;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +33,12 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 public class AiChatSocketHandler extends TextWebSocketHandler {
 
     private static final String SESSION_STARTED_KEY = "SESSION_STARTED";
+
+    private final LlmModelService llmModelService;
+
+    public AiChatSocketHandler(LlmModelService llmModelService) {
+        this.llmModelService = llmModelService;
+    }
 
     @Override
     public void afterConnectionEstablished(@NonNull WebSocketSession session) throws Exception {
@@ -63,10 +75,6 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
                 return;
             }
             markSessionStarted(session);
-            LlmResponse response = new LlmResponse();
-            response.setType(LlmMessageType.TEXT);
-            response.setMessage("会话已开启");
-            session.sendMessage(new TextMessage(MapperHolder.toJson(response)));
             return;
         }
 
@@ -87,10 +95,30 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
      * 处理聊天消息。
      */
     private void handleChat(WebSocketSession session, UserRequest request) throws Exception {
-        // TODO: 接入 LLM 服务
+        ChatPayload chatData = MapperHolder.mapper.convertValue(request.getData(), ChatPayload.class);
+        if (chatData.getModelId() == null || chatData.getContent() == null) {
+            sendError(session, "CHAT 消息缺少 modelId 或 content");
+            return;
+        }
+
+        LlmModel model = llmModelService.findById(chatData.getModelId());
+        if (model == null) {
+            sendError(session, "模型不存在");
+            return;
+        }
+
+        UserPrincipal user = getUser(session);
+        Long uid = model.getUid();
+        if (uid != null && uid != 0 && (user == null || !uid.equals(user.getId()))) {
+            sendError(session, "无权访问该模型");
+            return;
+        }
+
+        TextPayload textPayload = new TextPayload();
+        textPayload.setContent("你好，我是" + model.getModelId() + "模型，有什么能帮助我吗？");
         LlmResponse response = new LlmResponse();
         response.setType(LlmMessageType.TEXT);
-        response.setMessage("收到消息: " + request.getMessage());
+        response.setData(textPayload);
         session.sendMessage(new TextMessage(MapperHolder.toJson(response)));
     }
 
@@ -99,9 +127,11 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
      */
     private void handleToolAck(WebSocketSession session, UserRequest request) throws Exception {
         // TODO: 处理工具调用确认
+        TextPayload textPayload = new TextPayload();
+        textPayload.setContent("工具确认已收到");
         LlmResponse response = new LlmResponse();
         response.setType(LlmMessageType.TEXT);
-        response.setMessage("工具确认已收到");
+        response.setData(textPayload);
         session.sendMessage(new TextMessage(MapperHolder.toJson(response)));
     }
 
@@ -110,9 +140,11 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
      */
     private void handleStop(WebSocketSession session) throws Exception {
         // TODO: 停止 LLM 响应
+        DonePayload donePayload = new DonePayload();
+        donePayload.setReason("已停止");
         LlmResponse response = new LlmResponse();
         response.setType(LlmMessageType.DONE);
-        response.setMessage("已停止");
+        response.setData(donePayload);
         session.sendMessage(new TextMessage(MapperHolder.toJson(response)));
     }
 
@@ -120,9 +152,11 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
      * 发送错误消息。
      */
     private void sendError(WebSocketSession session, String errorMessage) throws Exception {
+        ErrorPayload errorPayload = new ErrorPayload();
+        errorPayload.setMessage(errorMessage);
         LlmResponse response = new LlmResponse();
         response.setType(LlmMessageType.ERROR);
-        response.setMessage(errorMessage);
+        response.setData(errorPayload);
         session.sendMessage(new TextMessage(MapperHolder.toJson(response)));
     }
 
