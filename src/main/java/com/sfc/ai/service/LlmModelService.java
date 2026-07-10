@@ -3,6 +3,7 @@ package com.sfc.ai.service;
 import com.sfc.ai.model.po.LlmModel;
 import com.xiaotao.saltedfishcloud.service.CrudService;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -17,6 +18,14 @@ public interface LlmModelService extends CrudService<LlmModel> {
      * @return 模型列表
      */
     List<LlmModel> findByProviderId(Long providerId);
+
+    /**
+     * 根据多个提供商 ID 批量查询模型列表
+     *
+     * @param providerIds 提供商 ID 集合
+     * @return 模型列表
+     */
+    List<LlmModel> findByProviderIds(Collection<Long> providerIds);
 
     /**
      * 根据提供商 ID 删除所有关联模型

@@ -4,6 +4,7 @@ import com.sfc.ai.config.AiWebSocketConfig;
 import com.sfc.ai.controller.AiChatSocketHandler;
 import com.sfc.ai.controller.LlmModelController;
 import com.sfc.ai.controller.LlmProviderController;
+import com.sfc.ai.controller.LlmQueryController;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.repo.LlmModelRepo;
 import com.sfc.ai.service.ChatClientService;
@@ -19,6 +20,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
         LlmModelController.class,
         LlmProviderServiceImpl.class,
         LlmModelServiceImpl.class,
+        LlmQueryController.class,
         ChatClientService.class,
         AiWebSocketConfig.class,
         AiChatSocketHandler.class,

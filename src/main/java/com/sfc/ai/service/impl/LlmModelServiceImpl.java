@@ -5,6 +5,7 @@ import com.sfc.ai.repo.LlmModelRepo;
 import com.sfc.ai.service.LlmModelService;
 import com.xiaotao.saltedfishcloud.service.CrudServiceImpl;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -15,6 +16,11 @@ public class LlmModelServiceImpl extends CrudServiceImpl<LlmModel, LlmModelRepo>
     @Override
     public List<LlmModel> findByProviderId(Long providerId) {
         return repository.findByLlmProviderId(providerId);
+    }
+
+    @Override
+    public List<LlmModel> findByProviderIds(Collection<Long> providerIds) {
+        return repository.findByLlmProviderIdIn(providerIds);
     }
 
     @Override
