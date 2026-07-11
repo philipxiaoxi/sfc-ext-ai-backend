@@ -11,4 +11,14 @@ public class DonePayload {
      * 停止原因
      */
     private String reason;
+
+    /**
+     * 模型表示
+     */
+    private String modelId;
+
+    /**
+     * 调用耗时（毫秒）
+     */
+    private Long time;
 }

@@ -177,6 +177,7 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
         chatClient = chatClient.mutate().defaultAdvisors(toolCallAdvise).build();
         LlmChatAdapter adapter = adapterRegistry.getAdapter(provider.getAdapter());
         assert user != null;
+        long startTime = System.currentTimeMillis();
         chatClient.prompt(Prompt.builder()
                         .messages(SystemMessage.builder()
                                 .text("你的咸鱼云网盘 AI 助手，可以帮助用户整理网盘、查找文件。当前用户用户名为: " + user.getUsername())
@@ -207,6 +208,18 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
                         sendError(session, "LLM 响应流处理过程中出错: " + throwable.getMessage());
                     } catch (Exception e) {
                         log.error("ai 消息发送出错", e);
+                    }
+                })
+                .doOnComplete(() -> {
+                    try {
+                        long elapsed = System.currentTimeMillis() - startTime;
+                        DonePayload donePayload = new DonePayload();
+                        donePayload.setReason("已完成");
+                        donePayload.setModelId(model.getModelId());
+                        donePayload.setTime(elapsed);
+                        sendJsonMessage(session, LlmMessageType.DONE, donePayload);
+                    } catch (Exception e) {
+                        log.error("发送 DONE 消息失败", e);
                     }
                 })
                 .subscribe(response -> {
