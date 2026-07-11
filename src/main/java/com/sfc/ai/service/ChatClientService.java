@@ -1,9 +1,11 @@
 package com.sfc.ai.service;
 
 import com.sfc.ai.adapter.LlmChatAdapterRegistry;
+import com.sfc.ai.advisor.SimpleToolCallAdvise;
+import com.sfc.ai.advisor.ToolCallNotifyingAdvisor;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.model.po.LlmProvider;
-import lombok.RequiredArgsConstructor;
+import com.sfc.ai.tool.CommonTools;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
@@ -14,12 +16,24 @@ import org.springframework.ai.chat.model.ChatModel;
 /**
  * AI 聊天客户端服务，用于根据 LLM 提供商和模型配置构建 {@link ChatClient} 实例。
  */
-@RequiredArgsConstructor
 public class ChatClientService {
 
     private final ChatMemoryRepository chatMemoryRepository;
 
     private final LlmChatAdapterRegistry adapterRegistry;
+
+    private final CommonTools commonTools;
+
+    private final ToolCallNotifyingAdvisor toolCallNotifyingAdvisor;
+
+    public ChatClientService(ChatMemoryRepository chatMemoryRepository,
+                              LlmChatAdapterRegistry adapterRegistry,
+                              CommonTools commonTools) {
+        this.chatMemoryRepository = chatMemoryRepository;
+        this.adapterRegistry = adapterRegistry;
+        this.commonTools = commonTools;
+        this.toolCallNotifyingAdvisor = ToolCallNotifyingAdvisor.builder().build();
+    }
 
     /**
      * 获取一个配置好的 ChatClient 实例。
@@ -38,7 +52,10 @@ public class ChatClientService {
                 .build();
 
         ChatClient.Builder builder = ChatClient.builder(chatModel)
-                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build());
+                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                .defaultAdvisors(toolCallNotifyingAdvisor)
+                .defaultAdvisors(new SimpleToolCallAdvise())
+                .defaultTools(commonTools);
 
         builder.defaultAdvisors(
                 advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId));
