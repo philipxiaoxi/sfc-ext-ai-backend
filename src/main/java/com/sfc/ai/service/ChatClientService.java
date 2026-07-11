@@ -40,6 +40,7 @@ public class ChatClientService {
                         .model(model.getModelId())
                         .apiKey(llmProvider.getApiKey())
                         .baseUrl(llmProvider.getBaseUrl())
+                        .reasoningEffort(model.getReasoningEffect())
                         .build())
                 .build();
         ChatClient.Builder builder = ChatClient.builder(openAiChatModel);

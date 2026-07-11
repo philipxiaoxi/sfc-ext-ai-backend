@@ -34,5 +34,10 @@ public class LlmModel extends AuditModel {
     /**
      * 思考模式
      */
-    private String reasoning;
+    private String reasoningEffect;
+
+    /**
+     * 是否启用思考模式(预留参数)
+     */
+    private Boolean enableThinking;
 }
