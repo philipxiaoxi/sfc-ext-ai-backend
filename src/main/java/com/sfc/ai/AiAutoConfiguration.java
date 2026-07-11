@@ -1,7 +1,11 @@
 package com.sfc.ai;
 
+import com.sfc.ai.adapter.DeepSeekChatAdapter;
+import com.sfc.ai.adapter.LlmChatAdapterRegistry;
+import com.sfc.ai.adapter.OpenAiChatAdapter;
 import com.sfc.ai.config.AiWebSocketConfig;
 import com.sfc.ai.controller.AiChatSocketHandler;
+import com.sfc.ai.controller.LlmAdapterController;
 import com.sfc.ai.controller.LlmModelController;
 import com.sfc.ai.controller.LlmProviderController;
 import com.sfc.ai.controller.LlmQueryController;
@@ -24,7 +28,11 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
         ChatClientService.class,
         AiWebSocketConfig.class,
         AiChatSocketHandler.class,
-        InMemoryChatMemoryRepository.class
+        InMemoryChatMemoryRepository.class,
+        LlmChatAdapterRegistry.class,
+        OpenAiChatAdapter.class,
+        DeepSeekChatAdapter.class,
+        LlmAdapterController.class
 })
 @EnableJpaRepositories(basePackageClasses = LlmModelRepo.class)
 @EntityScan(basePackageClasses = LlmModel.class)

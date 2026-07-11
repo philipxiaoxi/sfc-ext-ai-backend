@@ -22,10 +22,10 @@ public class LlmProvider extends AuditModel {
     private String name;
 
     /**
-     * 协议类型
+     * 适配器标识，如 "openai"、"deepseek"。
+     * 对应 {@link com.sfc.ai.adapter.LlmChatAdapter#getId()} 返回的值。
      */
-    @Enumerated(EnumType.STRING)
-    private ProtocolType protocolType;
+    private String adapter;
 
     /**
      * 请求地址
@@ -48,19 +48,4 @@ public class LlmProvider extends AuditModel {
     @Lob
     private String customHeader;
 
-    /**
-     * 协议类型
-     */
-    public enum ProtocolType {
-
-        /**
-         * OpenAI 协议
-         */
-        OpenAI,
-
-        /**
-         * Anthropic 协议
-         */
-        Anthropic
-    }
 }

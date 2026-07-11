@@ -22,9 +22,9 @@ public class ProviderVo {
     private String name;
 
     /**
-     * 协议类型
+     * 适配器标识
      */
-    private LlmProvider.ProtocolType protocolType;
+    private String adapter;
 
     /**
      * 从实体对象创建 VO
@@ -36,7 +36,7 @@ public class ProviderVo {
         ProviderVo vo = new ProviderVo();
         vo.setId(provider.getId());
         vo.setName(provider.getName());
-        vo.setProtocolType(provider.getProtocolType());
+        vo.setAdapter(provider.getAdapter());
         return vo;
     }
 }

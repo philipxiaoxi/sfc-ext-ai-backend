@@ -1,5 +1,7 @@
 package com.sfc.ai.controller;
 
+import com.sfc.ai.adapter.LlmChatAdapter;
+import com.sfc.ai.adapter.LlmChatAdapterRegistry;
 import com.sfc.ai.constant.LlmMessageType;
 import com.sfc.ai.constant.UserMessageType;
 import com.sfc.ai.model.chat.message.LlmResponse;
@@ -17,6 +19,7 @@ import com.sfc.ai.service.LlmModelService;
 import com.sfc.ai.service.LlmProviderService;
 import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
 import com.xiaotao.saltedfishcloud.utils.MapperHolder;
+import com.xiaotao.saltedfishcloud.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.ai.chat.client.ChatClient;
@@ -50,12 +53,14 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
     private final LlmModelService llmModelService;
     private final ChatClientService chatClientService;
     private final LlmProviderService llmProviderService;
+    private final LlmChatAdapterRegistry adapterRegistry;
 
     public AiChatSocketHandler(LlmModelService llmModelService, ChatClientService chatClientService,
-                               LlmProviderService llmProviderService) {
+                                LlmProviderService llmProviderService, LlmChatAdapterRegistry adapterRegistry) {
         this.llmModelService = llmModelService;
         this.chatClientService = chatClientService;
         this.llmProviderService = llmProviderService;
+        this.adapterRegistry = adapterRegistry;
     }
 
     @Override
@@ -157,6 +162,7 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
         }
         String sessionId = (String) session.getAttributes().get(SESSION_ID_KEY);
         ChatClient chatClient = chatClientService.getChatClient(provider, model, sessionId);
+        LlmChatAdapter adapter = adapterRegistry.getAdapter(provider.getAdapter());
         assert user != null;
         chatClient.prompt(Prompt.builder()
                         .messages(SystemMessage.builder()
@@ -170,12 +176,18 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
                 .flatMap(msg -> Flux.fromStream(msg.getResults().stream()))
                 .map(msg -> {
                     String text = msg.getOutput().getText();
+                    String reasoningContent = adapter.extractReasoningContent(msg.getOutput());
                     TextPayload textPayload = new TextPayload();
                     textPayload.setContent(text);
+                    textPayload.setReasoningContent(reasoningContent);
                     LlmResponse response = new LlmResponse();
                     response.setType(LlmMessageType.TEXT);
                     response.setData(textPayload);
                     return response;
+                })
+                .filter(response -> {
+                    TextPayload data = (TextPayload) response.getData();
+                    return StringUtils.hasText(data.getContent()) || StringUtils.hasText(data.getReasoningContent());
                 })
                 .doOnError(throwable -> {
                     try {
