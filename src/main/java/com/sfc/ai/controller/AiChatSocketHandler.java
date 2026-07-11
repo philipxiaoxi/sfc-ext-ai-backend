@@ -2,16 +2,12 @@ package com.sfc.ai.controller;
 
 import com.sfc.ai.adapter.LlmChatAdapter;
 import com.sfc.ai.adapter.LlmChatAdapterRegistry;
+import com.sfc.ai.advisor.ToolCallNotifyAdvisor;
 import com.sfc.ai.constant.LlmMessageType;
 import com.sfc.ai.constant.UserMessageType;
 import com.sfc.ai.model.chat.message.LlmResponse;
 import com.sfc.ai.model.chat.message.UserRequest;
-import com.sfc.ai.model.chat.payload.ChatPayload;
-import com.sfc.ai.model.chat.payload.DonePayload;
-import com.sfc.ai.model.chat.payload.ErrorPayload;
-import com.sfc.ai.model.chat.payload.SessionAckPayload;
-import com.sfc.ai.model.chat.payload.StartSessionPayload;
-import com.sfc.ai.model.chat.payload.TextPayload;
+import com.sfc.ai.model.chat.payload.*;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.model.po.LlmProvider;
 import com.sfc.ai.service.ChatClientService;
@@ -162,6 +158,23 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
         }
         String sessionId = (String) session.getAttributes().get(SESSION_ID_KEY);
         ChatClient chatClient = chatClientService.getChatClient(provider, model, sessionId);
+        ToolCallNotifyAdvisor toolCallAdvise = new ToolCallNotifyAdvisor(
+                startPayload -> {
+                    try {
+                        sendJsonMessage(session, LlmMessageType.TOOL_CALL_START, startPayload);
+                    } catch (Exception e) {
+                        log.error("发送 TOOL_CALL_START 消息失败", e);
+                    }
+                },
+                endPayload -> {
+                    try {
+                        sendJsonMessage(session, LlmMessageType.TOOL_CALL_END, endPayload);
+                    } catch (Exception e) {
+                        log.error("发送 TOOL_CALL_END 消息失败", e);
+                    }
+                }
+        );
+        chatClient = chatClient.mutate().defaultAdvisors(toolCallAdvise).build();
         LlmChatAdapter adapter = adapterRegistry.getAdapter(provider.getAdapter());
         assert user != null;
         chatClient.prompt(Prompt.builder()
@@ -240,6 +253,13 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
     /**
      * 发送错误消息。
      */
+    private void sendJsonMessage(WebSocketSession session, LlmMessageType type, Object data) throws Exception {
+        LlmResponse response = new LlmResponse();
+        response.setType(type);
+        response.setData(data);
+        session.sendMessage(new TextMessage(MapperHolder.toJsonNoEx(response)));
+    }
+
     private void sendError(WebSocketSession session, String errorMessage) throws Exception {
         ErrorPayload errorPayload = new ErrorPayload();
         errorPayload.setMessage(errorMessage);

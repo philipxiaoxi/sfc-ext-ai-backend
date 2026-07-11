@@ -1,8 +1,6 @@
 package com.sfc.ai.service;
 
 import com.sfc.ai.adapter.LlmChatAdapterRegistry;
-import com.sfc.ai.advisor.SimpleToolCallAdvise;
-import com.sfc.ai.advisor.ToolCallNotifyingAdvisor;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.model.po.LlmProvider;
 import com.sfc.ai.tool.CommonTools;
@@ -24,15 +22,12 @@ public class ChatClientService {
 
     private final CommonTools commonTools;
 
-    private final ToolCallNotifyingAdvisor toolCallNotifyingAdvisor;
-
     public ChatClientService(ChatMemoryRepository chatMemoryRepository,
                               LlmChatAdapterRegistry adapterRegistry,
                               CommonTools commonTools) {
         this.chatMemoryRepository = chatMemoryRepository;
         this.adapterRegistry = adapterRegistry;
         this.commonTools = commonTools;
-        this.toolCallNotifyingAdvisor = ToolCallNotifyingAdvisor.builder().build();
     }
 
     /**
@@ -53,8 +48,6 @@ public class ChatClientService {
 
         ChatClient.Builder builder = ChatClient.builder(chatModel)
                 .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
-                .defaultAdvisors(toolCallNotifyingAdvisor)
-                .defaultAdvisors(new SimpleToolCallAdvise())
                 .defaultTools(commonTools);
 
         builder.defaultAdvisors(

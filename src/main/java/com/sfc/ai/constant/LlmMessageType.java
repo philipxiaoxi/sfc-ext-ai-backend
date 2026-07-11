@@ -7,17 +7,17 @@ public enum LlmMessageType {
     /** 会话开始确认，表示接收了START_SESSION，并响应本次确定的会话id */
     SESSION_ACK,
 
+    /** 工具调用开始 */
+    TOOL_CALL_START,
+
+    /** 工具调用结束 */
+    TOOL_CALL_END,
+
     /** 工具调用告知 */
     TOOL_CALL,
 
     /** 工具调用请求，需要用户回应 */
     TOOL_CALL_REQ,
-
-    /** 进入思考 */
-    THINKING_START,
-
-    /** 思考结束 */
-    THINKING_END,
 
     /** 思考/回复纯文本消息 */
     TEXT,

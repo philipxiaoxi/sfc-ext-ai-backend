@@ -1,6 +1,7 @@
 package com.sfc.ai.tool;
 
 import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
 
 import java.time.LocalDateTime;
 
@@ -17,4 +18,13 @@ public class CommonTools {
         return LocalDateTime.now().toString();
     }
 
+    @Tool(description = "让 AI 等待指定的毫秒数")
+    public String sleep(@ToolParam(description = "等待的毫秒") long milliseconds) {
+        try {
+            Thread.sleep(milliseconds);
+        } catch (InterruptedException e) {
+            return e.getMessage();
+        }
+        return "ok";
+    }
 }
