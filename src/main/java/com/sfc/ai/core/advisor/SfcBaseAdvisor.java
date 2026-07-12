@@ -1,4 +1,4 @@
-package com.sfc.ai.advisor;
+package com.sfc.ai.core.advisor;
 
 import com.xiaotao.saltedfishcloud.utils.StringUtils;
 import org.jspecify.annotations.NonNull;

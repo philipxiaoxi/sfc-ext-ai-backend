@@ -1,4 +1,4 @@
-package com.sfc.ai.adapter;
+package com.sfc.ai.core.adapter;
 
 import com.xiaotao.saltedfishcloud.exception.JsonException;
 import org.springframework.beans.factory.annotation.Autowired;

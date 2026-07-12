@@ -1,10 +1,10 @@
-package com.sfc.ai.service;
+package com.sfc.ai.core;
 
-import com.sfc.ai.adapter.LlmChatAdapter;
-import com.sfc.ai.adapter.LlmChatAdapterRegistry;
-import com.sfc.ai.advisor.MessageConvertAdvisor;
-import com.sfc.ai.advisor.SfcChatMemoryAdvisor;
-import com.sfc.ai.core.SfcChatMemory;
+import com.sfc.ai.core.adapter.LlmChatAdapter;
+import com.sfc.ai.core.adapter.LlmChatAdapterRegistry;
+import com.sfc.ai.core.advisor.MessageConvertAdvisor;
+import com.sfc.ai.core.advisor.SfcChatMemoryAdvisor;
+import com.sfc.ai.core.memory.SfcChatMemory;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.model.po.LlmProvider;
 import com.sfc.ai.tool.CommonTools;

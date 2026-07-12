@@ -1,6 +1,5 @@
-package com.sfc.ai.core;
+package com.sfc.ai.core.memory;
 
-import com.xiaotao.saltedfishcloud.utils.DBUtils;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;

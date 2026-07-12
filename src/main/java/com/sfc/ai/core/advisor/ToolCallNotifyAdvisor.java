@@ -1,4 +1,4 @@
-package com.sfc.ai.advisor;
+package com.sfc.ai.core.advisor;
 
 import com.sfc.ai.model.chat.payload.ToolCallEndPayload;
 import com.sfc.ai.model.chat.payload.ToolCallStartPayload;

@@ -1,7 +1,7 @@
 package com.sfc.ai.controller;
 
-import com.sfc.ai.adapter.AdapterInfo;
-import com.sfc.ai.adapter.LlmChatAdapterRegistry;
+import com.sfc.ai.core.adapter.AdapterInfo;
+import com.sfc.ai.core.adapter.LlmChatAdapterRegistry;
 import com.xiaotao.saltedfishcloud.model.json.JsonResult;
 import com.xiaotao.saltedfishcloud.model.json.JsonResultImpl;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -1,5 +1,6 @@
 package com.sfc.ai.model.po;
 
+import com.sfc.ai.core.adapter.LlmChatAdapter;
 import com.xiaotao.saltedfishcloud.model.template.AuditModel;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -23,7 +24,7 @@ public class LlmProvider extends AuditModel {
 
     /**
      * 适配器标识，如 "openai"、"deepseek"。
-     * 对应 {@link com.sfc.ai.adapter.LlmChatAdapter#getId()} 返回的值。
+     * 对应 {@link LlmChatAdapter#getId()} 返回的值。
      */
     private String adapter;
 

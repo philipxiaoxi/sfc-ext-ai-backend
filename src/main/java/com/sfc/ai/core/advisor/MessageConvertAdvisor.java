@@ -1,6 +1,6 @@
-package com.sfc.ai.advisor;
+package com.sfc.ai.core.advisor;
 
-import com.sfc.ai.adapter.LlmChatAdapter;
+import com.sfc.ai.core.adapter.LlmChatAdapter;
 import org.jspecify.annotations.NonNull;
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;

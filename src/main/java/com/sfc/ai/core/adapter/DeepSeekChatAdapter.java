@@ -1,6 +1,6 @@
-package com.sfc.ai.adapter;
+package com.sfc.ai.core.adapter;
 
-import com.sfc.ai.model.chat.message.ReasoningContentSupport;
+import com.sfc.ai.core.message.ReasoningContentSupport;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.model.po.LlmProvider;
 import com.xiaotao.saltedfishcloud.utils.StringUtils;

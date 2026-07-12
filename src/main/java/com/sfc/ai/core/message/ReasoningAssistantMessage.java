@@ -1,4 +1,4 @@
-package com.sfc.ai.model.chat.message;
+package com.sfc.ai.core.message;
 
 import org.jspecify.annotations.Nullable;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -7,6 +7,9 @@ import org.springframework.ai.content.Media;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 带思维链内容的 LLM 响应消息
+ */
 public class ReasoningAssistantMessage extends AssistantMessage implements ReasoningContentSupport {
     private final String reasoningContent;
 

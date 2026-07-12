@@ -1,15 +1,15 @@
-package com.sfc.ai.repo;
+package com.sfc.ai.core.memory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.sfc.ai.model.chat.message.ReasoningAssistantMessage;
-import com.sfc.ai.model.chat.message.ReasoningContentSupport;
+import com.sfc.ai.core.message.ReasoningAssistantMessage;
+import com.sfc.ai.core.message.ReasoningContentSupport;
 import com.sfc.ai.model.po.AiChatMemory;
+import com.sfc.ai.repo.AiChatMemoryRepo;
 import com.xiaotao.saltedfishcloud.utils.MapperHolder;
 import org.jspecify.annotations.NonNull;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.messages.*;
-import org.springframework.ai.deepseek.DeepSeekAssistantMessage;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;

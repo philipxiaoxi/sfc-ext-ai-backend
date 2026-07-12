@@ -1,4 +1,4 @@
-package com.sfc.ai.model.chat.message;
+package com.sfc.ai.core.message;
 
 /**
  * 表示支持获取思考内容

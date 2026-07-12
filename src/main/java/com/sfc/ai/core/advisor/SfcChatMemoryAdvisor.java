@@ -1,7 +1,7 @@
-package com.sfc.ai.advisor;
+package com.sfc.ai.core.advisor;
 
-import com.sfc.ai.adapter.LlmChatAdapter;
-import com.sfc.ai.model.chat.message.ReasoningAssistantMessage;
+import com.sfc.ai.core.adapter.LlmChatAdapter;
+import com.sfc.ai.core.message.ReasoningAssistantMessage;
 import com.xiaotao.saltedfishcloud.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;

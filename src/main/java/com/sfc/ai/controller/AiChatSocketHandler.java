@@ -1,8 +1,8 @@
 package com.sfc.ai.controller;
 
-import com.sfc.ai.adapter.LlmChatAdapter;
-import com.sfc.ai.adapter.LlmChatAdapterRegistry;
-import com.sfc.ai.advisor.ToolCallNotifyAdvisor;
+import com.sfc.ai.core.adapter.LlmChatAdapter;
+import com.sfc.ai.core.adapter.LlmChatAdapterRegistry;
+import com.sfc.ai.core.advisor.ToolCallNotifyAdvisor;
 import com.sfc.ai.constant.LlmMessageType;
 import com.sfc.ai.constant.UserMessageType;
 import com.sfc.ai.model.chat.message.LlmResponse;
@@ -10,7 +10,7 @@ import com.sfc.ai.model.chat.message.UserRequest;
 import com.sfc.ai.model.chat.payload.*;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.model.po.LlmProvider;
-import com.sfc.ai.service.ChatClientService;
+import com.sfc.ai.core.ChatClientService;
 import com.sfc.ai.service.LlmModelService;
 import com.sfc.ai.service.LlmProviderService;
 import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;

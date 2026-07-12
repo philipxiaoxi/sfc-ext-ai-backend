@@ -1,4 +1,4 @@
-package com.sfc.ai.adapter;
+package com.sfc.ai.core.adapter;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
