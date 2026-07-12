@@ -49,7 +49,6 @@ public class ToolCallNotifyAdvisor implements BaseAdvisor {
     public @NonNull ChatClientRequest before(@NonNull ChatClientRequest chatClientRequest,
                                               @NonNull AdvisorChain advisorChain) {
         Message lastUserOrToolResponseMessage = chatClientRequest.prompt().getLastUserOrToolResponseMessage();
-        log.debug("{} 上一次用户或工具响应消息: {}", LOG_PREFIX, lastUserOrToolResponseMessage);
         if (lastUserOrToolResponseMessage instanceof ToolResponseMessage trm) {
             for (var tr : trm.getResponses()) {
                 if (pendingToolCallIds.remove(tr.id())) {

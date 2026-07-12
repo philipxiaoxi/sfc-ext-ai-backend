@@ -157,7 +157,6 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
             return;
         }
         String sessionId = (String) session.getAttributes().get(SESSION_ID_KEY);
-        ChatClient chatClient = chatClientService.getChatClient(provider, model, sessionId);
         ToolCallNotifyAdvisor toolCallAdvise = new ToolCallNotifyAdvisor(
                 startPayload -> {
                     try {
@@ -174,10 +173,13 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
                     }
                 }
         );
-        chatClient = chatClient.mutate().defaultAdvisors(toolCallAdvise).build();
         LlmChatAdapter adapter = adapterRegistry.getAdapter(provider.getAdapter());
         assert user != null;
         long startTime = System.currentTimeMillis();
+        ChatClient chatClient = chatClientService.getChatClient(provider, model, sessionId, adapter)
+                .mutate()
+                .defaultAdvisors(toolCallAdvise)
+                .build();
         chatClient.prompt(Prompt.builder()
                         .messages(SystemMessage.builder()
                                 .text("你的咸鱼云网盘 AI 助手，可以帮助用户整理网盘、查找文件。当前用户用户名为: " + user.getUsername())

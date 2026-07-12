@@ -2,11 +2,14 @@ package com.sfc.ai.repo;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.sfc.ai.model.chat.message.ReasoningAssistantMessage;
+import com.sfc.ai.model.chat.message.ReasoningContentSupport;
 import com.sfc.ai.model.po.AiChatMemory;
 import com.xiaotao.saltedfishcloud.utils.MapperHolder;
 import org.jspecify.annotations.NonNull;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.messages.*;
+import org.springframework.ai.deepseek.DeepSeekAssistantMessage;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -71,11 +74,13 @@ public class JpaChatMemoryRepository implements ChatMemoryRepository {
             case ASSISTANT -> {
                 List<AssistantMessage.ToolCall> toolCalls = parseList(entity.getToolCallData(),
                         new TypeReference<>() {});
-                yield AssistantMessage.builder()
-                        .content(entity.getContent())
-                        .toolCalls(toolCalls)
-                        .properties(metadata)
-                        .build();
+                yield new ReasoningAssistantMessage(
+                        entity.getContent(),
+                        entity.getReasoningContent(),
+                        metadata,
+                        toolCalls,
+                        List.of()
+                );
             }
             case SYSTEM -> SystemMessage.builder()
                     .text(entity.getContent())
@@ -105,6 +110,9 @@ public class JpaChatMemoryRepository implements ChatMemoryRepository {
         entity.setMessageType(message.getMessageType());
         entity.setContent(message.getText());
         entity.setMessageMetadata(toJson(message.getMetadata()));
+        if (message instanceof ReasoningContentSupport rcs) {
+            entity.setReasoningContent(rcs.getReasoningContent());
+        }
 
         if (message instanceof AssistantMessage am) {
             entity.setToolCallData(toJson(am.getToolCalls()));

@@ -49,4 +49,10 @@ public class AiChatMemory extends AuditModel {
      */
     @Lob
     private String toolCallData;
+
+    /**
+     * LLM 在产生这条对话消息时的思考内容
+     */
+    @Lob
+    private String reasoningContent;
 }

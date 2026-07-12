@@ -1,14 +1,15 @@
 package com.sfc.ai.service;
 
+import com.sfc.ai.adapter.LlmChatAdapter;
 import com.sfc.ai.adapter.LlmChatAdapterRegistry;
+import com.sfc.ai.advisor.SfcChatMemoryAdvisor;
+import com.sfc.ai.core.SfcChatMemory;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.model.po.LlmProvider;
 import com.sfc.ai.tool.CommonTools;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
-import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
 
 /**
@@ -38,21 +39,20 @@ public class ChatClientService {
      * @param conversationId 会话 ID，用于在 ChatMemory 中区分不同的对话
      * @return 配置完成的 ChatClient 实例
      */
-    public ChatClient getChatClient(LlmProvider llmProvider, LlmModel model, String conversationId) {
+    public ChatClient getChatClient(LlmProvider llmProvider, LlmModel model, String conversationId, LlmChatAdapter adapter) {
+        // 根据配置获取对话模型
         ChatModel chatModel = adapterRegistry.getAdapter(llmProvider.getAdapter())
                 .createChatModel(llmProvider, model);
 
-        ChatMemory chatMemory = MessageWindowChatMemory.builder()
-                .chatMemoryRepository(chatMemoryRepository)
-                .build();
-
+        // 配置记忆模块
         ChatClient.Builder builder = ChatClient.builder(chatModel)
-                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                .defaultAdvisors(new SfcChatMemoryAdvisor(adapter, SfcChatMemory.builder()
+                        .chatMemoryRepository(chatMemoryRepository)
+                        .build()))
                 .defaultTools(commonTools);
+        builder.defaultAdvisors(advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId));
 
-        builder.defaultAdvisors(
-                advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId));
-
+        // 组合构建对话客户端
         return builder.build();
     }
 }
