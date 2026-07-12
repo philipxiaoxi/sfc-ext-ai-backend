@@ -4,7 +4,10 @@ import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.model.po.LlmProvider;
 import org.jspecify.annotations.Nullable;
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatModel;
+
+import java.util.List;
 
 /**
  * LLM 聊天模型适配器接口。
@@ -62,5 +65,19 @@ public interface LlmChatAdapter {
     @Nullable
     default String extractReasoningContent(AssistantMessage message) {
         return null;
+    }
+
+    /**
+     * 预处理即将发送给 LLM 的消息列表。
+     * <p>
+     * 适配器可将通用消息类型转换为提供商特定的消息类型，
+     * 以保留厂商特有的消息字段（如推理内容），确保序列化为 HTTP 请求时不丢失。
+     * 默认实现直接返回原列表，无需转换的适配器无需重写。
+     *
+     * @param messages 当前请求的消息列表（含从记忆恢复的历史消息）
+     * @return 预处理后的消息列表
+     */
+    default List<Message> preprocessMessages(List<Message> messages) {
+        return messages;
     }
 }

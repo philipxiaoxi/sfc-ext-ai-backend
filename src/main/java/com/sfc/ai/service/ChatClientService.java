@@ -2,6 +2,7 @@ package com.sfc.ai.service;
 
 import com.sfc.ai.adapter.LlmChatAdapter;
 import com.sfc.ai.adapter.LlmChatAdapterRegistry;
+import com.sfc.ai.advisor.MessageConvertAdvisor;
 import com.sfc.ai.advisor.SfcChatMemoryAdvisor;
 import com.sfc.ai.core.SfcChatMemory;
 import com.sfc.ai.model.po.LlmModel;
@@ -44,11 +45,13 @@ public class ChatClientService {
         ChatModel chatModel = adapterRegistry.getAdapter(llmProvider.getAdapter())
                 .createChatModel(llmProvider, model);
 
-        // 配置记忆模块
+        // 配置记忆模块与消息转换
         ChatClient.Builder builder = ChatClient.builder(chatModel)
-                .defaultAdvisors(new SfcChatMemoryAdvisor(adapter, SfcChatMemory.builder()
-                        .chatMemoryRepository(chatMemoryRepository)
-                        .build()))
+                .defaultAdvisors(
+                        new SfcChatMemoryAdvisor(adapter, SfcChatMemory.builder()
+                                .chatMemoryRepository(chatMemoryRepository)
+                                .build()),
+                        new MessageConvertAdvisor(adapter))
                 .defaultTools(commonTools);
         builder.defaultAdvisors(advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId));
 
