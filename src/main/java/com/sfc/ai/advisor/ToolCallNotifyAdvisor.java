@@ -7,7 +7,6 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.client.advisor.api.AdvisorChain;
-import org.springframework.ai.chat.client.advisor.api.BaseAdvisor;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 
@@ -25,7 +24,7 @@ import java.util.function.Consumer;
  * </ul>
  */
 @Slf4j
-public class ToolCallNotifyAdvisor implements BaseAdvisor {
+public class ToolCallNotifyAdvisor extends SfcBaseAdvisor {
 
     private final static String LOG_PREFIX = "[LLM Tool Call]";
 

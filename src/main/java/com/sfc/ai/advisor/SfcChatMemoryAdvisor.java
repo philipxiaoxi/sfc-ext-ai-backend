@@ -7,7 +7,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;
-import org.springframework.ai.chat.client.advisor.AdvisorUtils;
 import org.springframework.ai.chat.client.advisor.api.AdvisorChain;
 import org.springframework.ai.chat.client.advisor.api.BaseChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.api.StreamAdvisorChain;
@@ -21,11 +20,13 @@ import org.springframework.util.Assert;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Slf4j
-public class SfcChatMemoryAdvisor implements BaseChatMemoryAdvisor {
+public class SfcChatMemoryAdvisor extends SfcBaseAdvisor implements BaseChatMemoryAdvisor {
     private final LlmChatAdapter llmChatAdapter;
     private final ChatMemory chatMemory;
 
@@ -196,12 +197,11 @@ public class SfcChatMemoryAdvisor implements BaseChatMemoryAdvisor {
                             });
 
                 }).map(response -> {
-                    if (AdvisorUtils.onFinishReason().test(response)) {
+                    if (this.isFinish(response)) {
                         response = after(response, streamAdvisorChain);
                     }
                     return response;
-                })
-                .onErrorResume(error -> Flux.error(new IllegalStateException("Stream processing failed", error)));
+                });
     }
 
     @Override
