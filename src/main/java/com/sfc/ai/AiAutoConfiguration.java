@@ -15,7 +15,7 @@ import com.sfc.ai.service.ChatClientService;
 import com.sfc.ai.service.impl.LlmModelServiceImpl;
 import com.sfc.ai.service.impl.LlmProviderServiceImpl;
 import com.sfc.ai.tool.CommonTools;
-import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
+import com.sfc.ai.repo.JpaChatMemoryRepository;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
@@ -29,7 +29,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
         ChatClientService.class,
         AiWebSocketConfig.class,
         AiChatSocketHandler.class,
-        InMemoryChatMemoryRepository.class,
+        JpaChatMemoryRepository.class,
         LlmChatAdapterRegistry.class,
         OpenAiChatAdapter.class,
         DeepSeekChatAdapter.class,
