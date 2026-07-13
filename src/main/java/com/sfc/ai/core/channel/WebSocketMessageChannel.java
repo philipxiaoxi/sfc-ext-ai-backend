@@ -30,6 +30,7 @@ public class WebSocketMessageChannel implements MessageChannel {
     private final ConcurrentLinkedQueue<TextMessage> queue = new ConcurrentLinkedQueue<>();
     private volatile boolean draining = false;
     private MessageHandler handler;
+    private Runnable closeHandler;
 
     public WebSocketMessageChannel(WebSocketSession session) {
         this.session = session;
@@ -74,7 +75,19 @@ public class WebSocketMessageChannel implements MessageChannel {
     }
 
     @Override
+    public void onClose(Runnable handler) {
+        this.closeHandler = handler;
+    }
+
+    @Override
     public void close() {
+        if (closeHandler != null) {
+            try {
+                closeHandler.run();
+            } catch (Exception e) {
+                log.warn("执行通道关闭回调时发生异常", e);
+            }
+        }
         try {
             session.close();
         } catch (IOException e) {

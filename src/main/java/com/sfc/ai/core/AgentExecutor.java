@@ -22,6 +22,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 
 import java.util.UUID;
@@ -47,6 +48,8 @@ public class AgentExecutor {
     private final AiConversationService aiConversationService;
 
     private ChatSession chatSession;
+    private Disposable chatDisposable;
+    private CompletableFuture<?> titleFuture;
 
     public AgentExecutor(MessageChannel channel,
                          LlmModelService llmModelService,
@@ -61,6 +64,21 @@ public class AgentExecutor {
         this.adapterRegistry = adapterRegistry;
         this.aiConversationService = aiConversationService;
         channel.onMessage(this::dispatch);
+        channel.onClose(this::onChannelClosed);
+    }
+
+    /**
+     * 通道关闭回调，取消所有进行中的操作。
+     */
+    private void onChannelClosed() {
+        log.debug("消息通道已关闭，取消所有进行中的 AI 操作");
+        if (chatDisposable != null && !chatDisposable.isDisposed()) {
+            chatDisposable.dispose();
+        }
+        if (titleFuture != null && !titleFuture.isDone()) {
+            titleFuture.cancel(true);
+        }
+        chatSession = null;
     }
 
     private void dispatch(UserRequest request) {
@@ -143,7 +161,7 @@ public class AgentExecutor {
                 .defaultAdvisors(toolCallAdvise)
                 .build();
 
-        chatClient.prompt(Prompt.builder()
+        this.chatDisposable = chatClient.prompt(Prompt.builder()
                         .messages(SystemMessage.builder()
                                 .text("你的咸鱼云网盘 AI 助手，可以帮助用户整理网盘、查找文件。当前用户用户名为: " + chatSession.getUser().getUsername())
                                 .build())
@@ -198,7 +216,7 @@ public class AgentExecutor {
     }
 
     private void generateTitleAsync(ChatPayload chatData, LlmProvider provider, LlmModel model) {
-        CompletableFuture.runAsync(() -> {
+        this.titleFuture = CompletableFuture.runAsync(() -> {
             try {
                 LlmChatAdapter adapter = adapterRegistry.getAdapter(provider.getAdapter());
                 ChatModel chatModel = adapter.createChatModel(provider, model);

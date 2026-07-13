@@ -35,6 +35,15 @@ public interface MessageChannel {
      */
     void onMessage(MessageHandler handler);
 
+    /**
+     * 注册通道关闭回调，在 {@link #close()} 执行时触发。
+     * <p>
+     * 通常由 {@code AgentExecutor} 注册，用于在连接断开时取消进行中的 LLM 请求等清理操作。
+     *
+     * @param handler 关闭回调
+     */
+    void onClose(Runnable handler);
+
     /** 关闭通道，释放底层资源。 */
     void close();
 
