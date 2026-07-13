@@ -22,6 +22,9 @@ public enum LlmMessageType {
     /** 思考/回复纯文本消息 */
     TEXT,
 
+    /** 对话标题更新 */
+    TITLE_UPDATE,
+
     /**已停止回应标记 */
     DONE,
 

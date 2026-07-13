@@ -12,6 +12,7 @@ import com.sfc.ai.controller.LlmQueryController;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.repo.LlmModelRepo;
 import com.sfc.ai.core.ChatClientService;
+import com.sfc.ai.service.impl.AiConversationServiceImpl;
 import com.sfc.ai.service.impl.LlmModelServiceImpl;
 import com.sfc.ai.service.impl.LlmProviderServiceImpl;
 import com.sfc.ai.tool.CommonTools;
@@ -34,6 +35,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
         OpenAiChatAdapter.class,
         DeepSeekChatAdapter.class,
         LlmAdapterController.class,
+        AiConversationServiceImpl.class,
         CommonTools.class
 })
 @EnableJpaRepositories(basePackageClasses = LlmModelRepo.class)

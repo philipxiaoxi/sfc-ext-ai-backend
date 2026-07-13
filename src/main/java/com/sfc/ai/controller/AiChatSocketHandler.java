@@ -8,9 +8,12 @@ import com.sfc.ai.constant.UserMessageType;
 import com.sfc.ai.model.chat.message.LlmResponse;
 import com.sfc.ai.model.chat.message.UserRequest;
 import com.sfc.ai.model.chat.payload.*;
+import com.sfc.ai.model.chat.payload.TitleUpdatePayload;
+import com.sfc.ai.model.po.AiConversation;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.model.po.LlmProvider;
 import com.sfc.ai.core.ChatClientService;
+import com.sfc.ai.service.AiConversationService;
 import com.sfc.ai.service.LlmModelService;
 import com.sfc.ai.service.LlmProviderService;
 import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
@@ -20,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.web.socket.CloseStatus;
@@ -30,6 +34,8 @@ import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * AI 聊天 WebSocket 处理器。
@@ -45,18 +51,24 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
 
     private static final String SESSION_STARTED_KEY = "SESSION_STARTED";
     private static final String SESSION_ID_KEY = "SESSION_ID";
+    private static final String FIRST_CHAT_KEY = "FIRST_CHAT";
+    private static final String MSG_QUEUE_KEY = "MSG_QUEUE";
+    private static final String MSG_PROC_KEY = "MSG_PROC";
 
     private final LlmModelService llmModelService;
     private final ChatClientService chatClientService;
     private final LlmProviderService llmProviderService;
     private final LlmChatAdapterRegistry adapterRegistry;
+    private final AiConversationService aiConversationService;
 
     public AiChatSocketHandler(LlmModelService llmModelService, ChatClientService chatClientService,
-                                LlmProviderService llmProviderService, LlmChatAdapterRegistry adapterRegistry) {
+                                LlmProviderService llmProviderService, LlmChatAdapterRegistry adapterRegistry,
+                                AiConversationService aiConversationService) {
         this.llmModelService = llmModelService;
         this.chatClientService = chatClientService;
         this.llmProviderService = llmProviderService;
         this.adapterRegistry = adapterRegistry;
+        this.aiConversationService = aiConversationService;
     }
 
     @Override
@@ -101,12 +113,15 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
                 sessionId = UUID.randomUUID().toString();
             }
             session.getAttributes().put(SESSION_ID_KEY, sessionId);
+            // 检查是否为全新对话
+            boolean isNew = !aiConversationService.existsByConversationId(sessionId);
+            session.getAttributes().put(FIRST_CHAT_KEY, isNew);
 
             SessionAckPayload ackPayload = new SessionAckPayload(sessionId);
             LlmResponse response = new LlmResponse();
             response.setType(LlmMessageType.SESSION_ACK);
             response.setData(ackPayload);
-            session.sendMessage(new TextMessage(MapperHolder.toJson(response)));
+            sendMessageSafe(session, new TextMessage(MapperHolder.toJson(response)));
             return;
         }
 
@@ -155,6 +170,12 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
         if (provider == null) {
             sendError(session, "模型提供商不存在");
             return;
+        }
+        // 检测是否为全新对话的首次 CHAT，异步生成标题
+        boolean isFirstChat = Boolean.TRUE.equals(session.getAttributes().get(FIRST_CHAT_KEY));
+        session.getAttributes().put(FIRST_CHAT_KEY, false);
+        if (isFirstChat) {
+            generateTitleAsync(session, chatData, user, provider, model);
         }
         String sessionId = (String) session.getAttributes().get(SESSION_ID_KEY);
         ToolCallNotifyAdvisor toolCallAdvise = new ToolCallNotifyAdvisor(
@@ -225,15 +246,7 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
                     }
                 })
                 .subscribe(response -> {
-                    try {
-                        session.sendMessage(new TextMessage(MapperHolder.toJsonNoEx(response)));
-                    } catch (IOException e) {
-                        try {
-                            sendError(session, e.getMessage());
-                        } catch (Exception ex) {
-                            log.error("ai 消息发送出错", ex);
-                        }
-                    }
+                    sendMessageSafe(session, new TextMessage(MapperHolder.toJsonNoEx(response)));
                 });
 
 
@@ -249,7 +262,7 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
         LlmResponse response = new LlmResponse();
         response.setType(LlmMessageType.TEXT);
         response.setData(textPayload);
-        session.sendMessage(new TextMessage(MapperHolder.toJson(response)));
+        sendMessageSafe(session, new TextMessage(MapperHolder.toJson(response)));
     }
 
     /**
@@ -262,26 +275,122 @@ public class AiChatSocketHandler extends TextWebSocketHandler {
         LlmResponse response = new LlmResponse();
         response.setType(LlmMessageType.DONE);
         response.setData(donePayload);
-        session.sendMessage(new TextMessage(MapperHolder.toJson(response)));
+        sendMessageSafe(session, new TextMessage(MapperHolder.toJson(response)));
+    }
+
+    /**
+     * 异步生成对话标题并保存。
+     */
+    private void generateTitleAsync(WebSocketSession session, ChatPayload chatData, UserPrincipal user,
+                                     LlmProvider provider, LlmModel model) {
+        String sessionId = (String) session.getAttributes().get(SESSION_ID_KEY);
+        if (sessionId == null) return;
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                String adapterId = provider.getAdapter();
+                LlmChatAdapter adapter = adapterRegistry.getAdapter(adapterId);
+                ChatModel chatModel = adapter.createChatModel(provider, model);
+                ChatClient bareClient = ChatClient.builder(chatModel).build();
+
+                String title = bareClient.prompt()
+                        .user("用20个字符以内总结以下消息：" + chatData.getContent())
+                        .call()
+                        .content();
+
+                if (title == null || title.isBlank()) {
+                    title = "新对话";
+                }
+
+                AiConversation conversation = new AiConversation();
+                conversation.setConversationId(sessionId);
+                conversation.setTitle(title);
+                conversation.setUid(user.getId());
+                aiConversationService.save(conversation);
+
+                TitleUpdatePayload titlePayload = new TitleUpdatePayload();
+                titlePayload.setTitle(title);
+                titlePayload.setConversationId(sessionId);
+                sendJsonMessage(session, LlmMessageType.TITLE_UPDATE, titlePayload);
+            } catch (Exception e) {
+                log.error("生成对话标题失败", e);
+            }
+        });
     }
 
     /**
      * 发送错误消息。
      */
-    private void sendJsonMessage(WebSocketSession session, LlmMessageType type, Object data) throws Exception {
+    private void sendJsonMessage(WebSocketSession session, LlmMessageType type, Object data) {
         LlmResponse response = new LlmResponse();
         response.setType(type);
         response.setData(data);
-        session.sendMessage(new TextMessage(MapperHolder.toJsonNoEx(response)));
+        sendMessageSafe(session, new TextMessage(MapperHolder.toJsonNoEx(response)));
     }
 
-    private void sendError(WebSocketSession session, String errorMessage) throws Exception {
-        ErrorPayload errorPayload = new ErrorPayload();
-        errorPayload.setMessage(errorMessage);
-        LlmResponse response = new LlmResponse();
-        response.setType(LlmMessageType.ERROR);
-        response.setData(errorPayload);
-        session.sendMessage(new TextMessage(MapperHolder.toJson(response)));
+    private void sendError(WebSocketSession session, String errorMessage) {
+        try {
+            ErrorPayload errorPayload = new ErrorPayload();
+            errorPayload.setMessage(errorMessage);
+            LlmResponse response = new LlmResponse();
+            response.setType(LlmMessageType.ERROR);
+            response.setData(errorPayload);
+            sendMessageSafe(session, new TextMessage(MapperHolder.toJson(response)));
+        } catch (Exception e) {
+            log.error("发送错误消息失败", e);
+        }
+    }
+
+    /**
+     * 安全地发送 WebSocket 消息。所有发送调用都应通过此方法，而非直接调用
+     * {@code WebSocketSession.sendMessage(TextMessage)}。
+     * <p>
+     * 方法内部对每个 WebSocket 会话维护一个消息队列，新消息先入队，再由单个线程
+     * 依次排空并发送，从而避免多线程并发调用 {@code session.sendMessage} 导致的
+     * 数据交错或连接异常。
+     */
+    @SuppressWarnings("unchecked")
+    private void sendMessageSafe(WebSocketSession session, TextMessage message) {
+        ConcurrentLinkedQueue<TextMessage> queue = (ConcurrentLinkedQueue<TextMessage>)
+                session.getAttributes().computeIfAbsent(MSG_QUEUE_KEY, k -> new ConcurrentLinkedQueue<>());
+        queue.add(message);
+        tryDrain(session, queue);
+    }
+
+    /**
+     * 尝试排空指定会话的消息队列。
+     * <p>
+     * 使用 {@link #MSG_PROC_KEY} 作为处理标记确保同一时间只有一个线程在发送消息。
+     * 发送完所有排队消息后清除标记，再检查一次队列是否有新消息（处理并发入队竞争），
+     * 若有则递归继续排空。
+     */
+    private void tryDrain(WebSocketSession session, ConcurrentLinkedQueue<TextMessage> queue) {
+        synchronized (session) {
+            if (Boolean.TRUE.equals(session.getAttributes().get(MSG_PROC_KEY))) {
+                return;
+            }
+            session.getAttributes().put(MSG_PROC_KEY, Boolean.TRUE);
+        }
+
+        try {
+            while (true) {
+                TextMessage msg = queue.poll();
+                if (msg == null) break;
+                try {
+                    session.sendMessage(msg);
+                } catch (IOException e) {
+                    log.error("WebSocket 消息发送失败", e);
+                    break;
+                }
+            }
+        } finally {
+            synchronized (session) {
+                session.getAttributes().put(MSG_PROC_KEY, Boolean.FALSE);
+            }
+            if (!queue.isEmpty()) {
+                tryDrain(session, queue);
+            }
+        }
     }
 
     @Override
