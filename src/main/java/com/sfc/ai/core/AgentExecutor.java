@@ -28,7 +28,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * AI Agent 执行器。
+ * AI Agent 执行器默认实现。
  * <p>
  * 负责 LLM 调用、流式响应处理、工具调用追踪等 Agent 核心逻辑。
  * 持有 {@link MessageChannel} 引用用于消息收发，内部管理 {@link ChatSession} 会话状态。
@@ -49,11 +49,11 @@ public class AgentExecutor {
     private ChatSession chatSession;
 
     public AgentExecutor(MessageChannel channel,
-                          LlmModelService llmModelService,
-                          ChatClientService chatClientService,
-                          LlmProviderService llmProviderService,
-                          LlmChatAdapterRegistry adapterRegistry,
-                          AiConversationService aiConversationService) {
+                         LlmModelService llmModelService,
+                         ChatClientService chatClientService,
+                         LlmProviderService llmProviderService,
+                         LlmChatAdapterRegistry adapterRegistry,
+                         AiConversationService aiConversationService) {
         this.channel = channel;
         this.llmModelService = llmModelService;
         this.chatClientService = chatClientService;

@@ -1,12 +1,7 @@
 package com.sfc.ai.controller;
 
-import com.sfc.ai.core.AgentExecutor;
-import com.sfc.ai.core.ChatClientService;
-import com.sfc.ai.core.adapter.LlmChatAdapterRegistry;
+import com.sfc.ai.core.AgentExecutorFactory;
 import com.sfc.ai.core.channel.WebSocketMessageChannel;
-import com.sfc.ai.service.AiConversationService;
-import com.sfc.ai.service.LlmModelService;
-import com.sfc.ai.service.LlmProviderService;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.web.socket.CloseStatus;
@@ -19,41 +14,28 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
  * <p>
  * 仅参与 Agent 会话的初始化创建与销毁：
  * <ul>
- *   <li>连接建立 → 创建 {@link WebSocketMessageChannel} + {@link AgentExecutor}</li>
+ *   <li>连接建立 → 创建 {@link WebSocketMessageChannel} + AgentExecutor</li>
  *   <li>消息到达 → 转发给 {@link WebSocketMessageChannel#receive(String)}</li>
  *   <li>连接关闭 → 关闭 channel</li>
  * </ul>
  * 不维护任何会话内部状态。
  */
 @Slf4j
-public class AiChatSocketHandler extends TextWebSocketHandler {
+public class AiChatWebSocketHandler extends TextWebSocketHandler {
 
     private static final String CHANNEL_KEY = "WS_CHANNEL";
 
-    private final LlmModelService llmModelService;
-    private final ChatClientService chatClientService;
-    private final LlmProviderService llmProviderService;
-    private final LlmChatAdapterRegistry adapterRegistry;
-    private final AiConversationService aiConversationService;
+    private final AgentExecutorFactory agentExecutorFactory;
 
-    public AiChatSocketHandler(LlmModelService llmModelService,
-                                ChatClientService chatClientService,
-                                LlmProviderService llmProviderService,
-                                LlmChatAdapterRegistry adapterRegistry,
-                                AiConversationService aiConversationService) {
-        this.llmModelService = llmModelService;
-        this.chatClientService = chatClientService;
-        this.llmProviderService = llmProviderService;
-        this.adapterRegistry = adapterRegistry;
-        this.aiConversationService = aiConversationService;
+    public AiChatWebSocketHandler(AgentExecutorFactory agentExecutorFactory) {
+        this.agentExecutorFactory = agentExecutorFactory;
     }
 
     @Override
     public void afterConnectionEstablished(@NonNull WebSocketSession session) throws Exception {
         super.afterConnectionEstablished(session);
         WebSocketMessageChannel channel = new WebSocketMessageChannel(session);
-        new AgentExecutor(channel, llmModelService, chatClientService,
-                llmProviderService, adapterRegistry, aiConversationService);
+        agentExecutorFactory.create(channel);
         session.getAttributes().put(CHANNEL_KEY, channel);
     }
 

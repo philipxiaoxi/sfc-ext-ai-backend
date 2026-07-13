@@ -1,16 +1,13 @@
 package com.sfc.ai;
 
+import com.sfc.ai.controller.*;
 import com.sfc.ai.core.adapter.DeepSeekChatAdapter;
 import com.sfc.ai.core.adapter.LlmChatAdapterRegistry;
 import com.sfc.ai.core.adapter.OpenAiChatAdapter;
 import com.sfc.ai.config.AiWebSocketConfig;
-import com.sfc.ai.controller.AiChatSocketHandler;
-import com.sfc.ai.controller.LlmAdapterController;
-import com.sfc.ai.controller.LlmModelController;
-import com.sfc.ai.controller.LlmProviderController;
-import com.sfc.ai.controller.LlmQueryController;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.repo.LlmModelRepo;
+import com.sfc.ai.core.AgentExecutorFactory;
 import com.sfc.ai.core.ChatClientService;
 import com.sfc.ai.service.impl.AiConversationServiceImpl;
 import com.sfc.ai.service.impl.LlmModelServiceImpl;
@@ -29,7 +26,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
         LlmQueryController.class,
         ChatClientService.class,
         AiWebSocketConfig.class,
-        AiChatSocketHandler.class,
+        AgentExecutorFactory.class,
+        AiChatWebSocketHandler.class,
         JpaChatMemoryRepository.class,
         LlmChatAdapterRegistry.class,
         OpenAiChatAdapter.class,
