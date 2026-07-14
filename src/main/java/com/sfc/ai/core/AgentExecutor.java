@@ -16,6 +16,11 @@ import com.sfc.ai.service.AiConversationService;
 import com.sfc.ai.service.LlmModelService;
 import com.sfc.ai.service.LlmProviderService;
 import com.xiaotao.saltedfishcloud.utils.MapperHolder;
+import com.sfc.ai.core.tool.ChannelMediatedToolCallback;
+import com.sfc.ai.core.tool.RegisteredTool;
+import com.sfc.ai.model.chat.payload.RegisterToolPayload;
+import com.sfc.ai.model.chat.payload.ToolCallAckPayload;
+import com.sfc.ai.tool.CommonTools;
 import com.xiaotao.saltedfishcloud.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -25,8 +30,12 @@ import org.springframework.ai.chat.prompt.Prompt;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * AI Agent 执行器默认实现。
@@ -46,6 +55,10 @@ public class AgentExecutor {
     private final LlmProviderService llmProviderService;
     private final LlmChatAdapterRegistry adapterRegistry;
     private final AiConversationService aiConversationService;
+    private final CommonTools commonTools;
+
+    private final Map<String, RegisteredTool> registeredTools = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CompletableFuture<String>> pendingToolCalls = new ConcurrentHashMap<>();
 
     private ChatSession chatSession;
     private Disposable chatDisposable;
@@ -56,13 +69,15 @@ public class AgentExecutor {
                          ChatClientService chatClientService,
                          LlmProviderService llmProviderService,
                          LlmChatAdapterRegistry adapterRegistry,
-                         AiConversationService aiConversationService) {
+                         AiConversationService aiConversationService,
+                         CommonTools commonTools) {
         this.channel = channel;
         this.llmModelService = llmModelService;
         this.chatClientService = chatClientService;
         this.llmProviderService = llmProviderService;
         this.adapterRegistry = adapterRegistry;
         this.aiConversationService = aiConversationService;
+        this.commonTools = commonTools;
         channel.onMessage(this::dispatch);
         channel.onClose(this::onChannelClosed);
     }
@@ -78,6 +93,8 @@ public class AgentExecutor {
         if (titleFuture != null && !titleFuture.isDone()) {
             titleFuture.cancel(true);
         }
+        pendingToolCalls.values().forEach(f -> f.cancel(true));
+        pendingToolCalls.clear();
         chatSession = null;
     }
 
@@ -90,8 +107,9 @@ public class AgentExecutor {
             switch (request.getType()) {
                 case START_SESSION -> handleStartSession(request);
                 case CHAT -> handleChat(request);
-                case TOOL_ACK -> handleToolAck();
+                case TOOL_ACK -> handleToolAck(request);
                 case STOP -> handleStop();
+                case REGISTER_TOOL -> handleRegisterTool(request);
                 default -> channel.sendError("未知消息类型: " + request.getType());
             }
         } catch (Throwable e) {
@@ -156,7 +174,14 @@ public class AgentExecutor {
 
         LlmChatAdapter adapter = adapterRegistry.getAdapter(provider.getAdapter());
         long startTime = System.currentTimeMillis();
-        ChatClient chatClient = chatClientService.getChatClient(provider, model, chatSession.getSessionId(), adapter)
+
+        List<Object> dynamicTools = new ArrayList<>();
+        for (RegisteredTool rt : registeredTools.values()) {
+            dynamicTools.add(new ChannelMediatedToolCallback(rt, channel, pendingToolCalls));
+        }
+        ChatClient chatClient = chatClientService.getChatClient(
+                provider, model, chatSession.getSessionId(), adapter,
+                dynamicTools.toArray())
                 .mutate()
                 .defaultAdvisors(toolCallAdvise)
                 .build();
@@ -203,10 +228,22 @@ public class AgentExecutor {
                 });
     }
 
-    private void handleToolAck() {
-        TextPayload textPayload = new TextPayload();
-        textPayload.setContent("工具确认已收到");
-        channel.send(LlmMessageType.TEXT, textPayload);
+    private void handleRegisterTool(UserRequest request) {
+        RegisterToolPayload payload = MapperHolder.mapper.convertValue(
+                request.getData(), RegisterToolPayload.class);
+        registeredTools.put(payload.getName(),
+                new RegisteredTool(payload.getName(), payload.getDescription(), payload.getParameters()));
+    }
+
+    private void handleToolAck(UserRequest request) {
+        ToolCallAckPayload ack = MapperHolder.mapper.convertValue(
+                request.getData(), ToolCallAckPayload.class);
+        CompletableFuture<String> future = pendingToolCalls.remove(ack.getId());
+        if (future != null) {
+            future.complete(ack.getResult());
+        } else {
+            log.warn("收到未知工具调用 ID 的 TOOL_ACK: {}", ack.getId());
+        }
     }
 
     private void handleStop() {

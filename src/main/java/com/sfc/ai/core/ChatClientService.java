@@ -13,6 +13,10 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.model.ChatModel;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 /**
  * AI 聊天客户端服务，用于根据 LLM 提供商和模型配置构建 {@link ChatClient} 实例。
  */
@@ -38,12 +42,18 @@ public class ChatClientService {
      * @param llmProvider    LLM 提供商配置（含 API Key、地址、适配器标识等）
      * @param model          使用的模型配置（含模型 ID）
      * @param conversationId 会话 ID，用于在 ChatMemory 中区分不同的对话
+     * @param extraTools     额外注入的工具回调（如动态注册的工具），与 commonTools 合并
      * @return 配置完成的 ChatClient 实例
      */
-    public ChatClient getChatClient(LlmProvider llmProvider, LlmModel model, String conversationId, LlmChatAdapter adapter) {
+    public ChatClient getChatClient(LlmProvider llmProvider, LlmModel model, String conversationId, LlmChatAdapter adapter, Object... extraTools) {
         // 根据配置获取对话模型
         ChatModel chatModel = adapterRegistry.getAdapter(llmProvider.getAdapter())
                 .createChatModel(llmProvider, model);
+
+        // 合并内建工具与额外工具
+        List<Object> allTools = new ArrayList<>();
+        allTools.add(commonTools);
+        Collections.addAll(allTools, extraTools);
 
         // 配置记忆模块与消息转换
         ChatClient.Builder builder = ChatClient.builder(chatModel)
@@ -52,10 +62,12 @@ public class ChatClientService {
                                 .chatMemoryRepository(chatMemoryRepository)
                                 .build()),
                         new MessageConvertAdvisor(adapter))
-                .defaultTools(commonTools);
+                .defaultTools(allTools.toArray());
         builder.defaultAdvisors(advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId));
 
         // 组合构建对话客户端
         return builder.build();
     }
+
+
 }

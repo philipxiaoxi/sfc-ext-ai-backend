@@ -11,6 +11,9 @@ public enum UserMessageType {
     /** 发送给 LLM 的普通用户消息 */
     CHAT,
 
+    /** 注册工具 */
+    REGISTER_TOOL,
+
     /** 用户对 LLM 发起的工具调用的确认回应 */
     TOOL_ACK,
 

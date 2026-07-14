@@ -5,6 +5,7 @@ import com.sfc.ai.core.channel.MessageChannel;
 import com.sfc.ai.service.AiConversationService;
 import com.sfc.ai.service.LlmModelService;
 import com.sfc.ai.service.LlmProviderService;
+import com.sfc.ai.tool.CommonTools;
 
 /**
  * {@link AgentExecutor} 工厂，将 AgentExecutor 的依赖注入与创建逻辑封装在一起。
@@ -18,17 +19,20 @@ public class AgentExecutorFactory {
     private final LlmProviderService llmProviderService;
     private final LlmChatAdapterRegistry adapterRegistry;
     private final AiConversationService aiConversationService;
+    private final CommonTools commonTools;
 
     public AgentExecutorFactory(LlmModelService llmModelService,
                                  ChatClientService chatClientService,
                                  LlmProviderService llmProviderService,
                                  LlmChatAdapterRegistry adapterRegistry,
-                                 AiConversationService aiConversationService) {
+                                 AiConversationService aiConversationService,
+                                 CommonTools commonTools) {
         this.llmModelService = llmModelService;
         this.chatClientService = chatClientService;
         this.llmProviderService = llmProviderService;
         this.adapterRegistry = adapterRegistry;
         this.aiConversationService = aiConversationService;
+        this.commonTools = commonTools;
     }
 
     /**
@@ -44,7 +48,8 @@ public class AgentExecutorFactory {
                 chatClientService,
                 llmProviderService,
                 adapterRegistry,
-                aiConversationService
+                aiConversationService,
+                commonTools
         );
     }
 }
