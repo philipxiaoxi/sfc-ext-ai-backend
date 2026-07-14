@@ -2,7 +2,6 @@ package com.sfc.ai.core;
 
 import com.sfc.ai.core.adapter.LlmChatAdapter;
 import com.sfc.ai.core.adapter.LlmChatAdapterRegistry;
-import com.sfc.ai.core.advisor.ToolCallNotifyAdvisor;
 import com.sfc.ai.constant.LlmMessageType;
 import com.sfc.ai.core.channel.MessageChannel;
 import com.sfc.ai.model.chat.message.LlmResponse;
@@ -18,10 +17,14 @@ import com.sfc.ai.service.LlmProviderService;
 import com.xiaotao.saltedfishcloud.utils.MapperHolder;
 import com.sfc.ai.core.tool.ChannelMediatedToolCallback;
 import com.sfc.ai.core.tool.RegisteredTool;
+import com.sfc.ai.core.tool.SfcAgentToolCallbackDecorator;
 import com.sfc.ai.model.chat.payload.RegisterToolPayload;
 import com.sfc.ai.model.chat.payload.ToolCallAckPayload;
 import com.sfc.ai.tool.CommonTools;
+import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
 import com.xiaotao.saltedfishcloud.utils.StringUtils;
+import org.springframework.ai.support.ToolCallbacks;
+import org.springframework.ai.tool.ToolCallback;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -167,24 +170,20 @@ public class AgentExecutor {
             generateTitleAsync(chatData, provider, model);
         }
 
-        ToolCallNotifyAdvisor toolCallAdvise = new ToolCallNotifyAdvisor(
-                startPayload -> channel.send(LlmMessageType.TOOL_CALL_START, startPayload),
-                endPayload -> channel.send(LlmMessageType.TOOL_CALL_END, endPayload)
-        );
-
         LlmChatAdapter adapter = adapterRegistry.getAdapter(provider.getAdapter());
         long startTime = System.currentTimeMillis();
 
-        List<Object> dynamicTools = new ArrayList<>(registeredTools.values());
+        UserPrincipal currentUser = chatSession.getUser();
+        List<ToolCallback> allTools = new ArrayList<>();
+        for (ChannelMediatedToolCallback callback : registeredTools.values()) {
+            allTools.add(new SfcAgentToolCallbackDecorator(callback, channel, currentUser));
+        }
+        for (ToolCallback callback : ToolCallbacks.from(commonTools)) {
+            allTools.add(new SfcAgentToolCallbackDecorator(callback, channel, currentUser));
+        }
         ChatClient chatClient = chatClientService.getChatClient(
                 provider, model, chatSession.getSessionId(), adapter,
-                builder -> {
-                    builder.defaultTools(dynamicTools.toArray());
-                    builder.defaultToolContext(Map.of("user", chatSession.getUser()));
-                })
-                .mutate()
-                .defaultAdvisors(toolCallAdvise)
-                .build();
+                builder -> builder.defaultTools(allTools.toArray()));
 
         this.chatDisposable = chatClient.prompt(Prompt.builder()
                         .messages(SystemMessage.builder()
