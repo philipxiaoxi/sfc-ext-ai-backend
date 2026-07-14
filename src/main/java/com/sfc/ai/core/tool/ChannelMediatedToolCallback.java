@@ -5,6 +5,7 @@ import com.sfc.ai.core.channel.MessageChannel;
 import com.sfc.ai.model.chat.payload.ToolCallStartPayload;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
+import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.ai.tool.execution.ToolExecutionException;
@@ -65,5 +66,10 @@ public class ChannelMediatedToolCallback implements ToolCallback {
         } finally {
             pendingToolCalls.remove(toolCallId);
         }
+    }
+
+    @Override
+    public @NonNull String call(@NonNull String toolInput, @NonNull ToolContext toolContext) {
+        return call(toolInput);
     }
 }

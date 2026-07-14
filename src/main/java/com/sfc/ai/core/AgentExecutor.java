@@ -57,7 +57,7 @@ public class AgentExecutor {
     private final AiConversationService aiConversationService;
     private final CommonTools commonTools;
 
-    private final Map<String, RegisteredTool> registeredTools = new ConcurrentHashMap<>();
+    private final Map<String, ChannelMediatedToolCallback> registeredTools = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CompletableFuture<String>> pendingToolCalls = new ConcurrentHashMap<>();
 
     private ChatSession chatSession;
@@ -175,13 +175,13 @@ public class AgentExecutor {
         LlmChatAdapter adapter = adapterRegistry.getAdapter(provider.getAdapter());
         long startTime = System.currentTimeMillis();
 
-        List<Object> dynamicTools = new ArrayList<>();
-        for (RegisteredTool rt : registeredTools.values()) {
-            dynamicTools.add(new ChannelMediatedToolCallback(rt, channel, pendingToolCalls));
-        }
+        List<Object> dynamicTools = new ArrayList<>(registeredTools.values());
         ChatClient chatClient = chatClientService.getChatClient(
                 provider, model, chatSession.getSessionId(), adapter,
-                dynamicTools.toArray())
+                builder -> {
+                    builder.defaultTools(dynamicTools.toArray());
+                    builder.defaultToolContext(Map.of("user", chatSession.getUser()));
+                })
                 .mutate()
                 .defaultAdvisors(toolCallAdvise)
                 .build();
@@ -232,7 +232,9 @@ public class AgentExecutor {
         RegisterToolPayload payload = MapperHolder.mapper.convertValue(
                 request.getData(), RegisterToolPayload.class);
         registeredTools.put(payload.getName(),
-                new RegisteredTool(payload.getName(), payload.getDescription(), payload.getParameters()));
+                new ChannelMediatedToolCallback(
+                        new RegisteredTool(payload.getName(), payload.getDescription(), payload.getParameters()),
+                        channel, pendingToolCalls));
         log.debug("通过 MessageChannel 注册工具: {}", payload.getName());
         channel.send(LlmMessageType.REGISTER_TOOL_ACK, payload.getName());
     }
