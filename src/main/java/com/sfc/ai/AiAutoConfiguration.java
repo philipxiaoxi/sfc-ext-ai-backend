@@ -13,6 +13,7 @@ import com.sfc.ai.service.impl.AiConversationServiceImpl;
 import com.sfc.ai.service.impl.LlmModelServiceImpl;
 import com.sfc.ai.service.impl.LlmProviderServiceImpl;
 import com.sfc.ai.tool.CommonTools;
+import com.sfc.ai.tool.NetDiskTools;
 import com.sfc.ai.core.memory.JpaChatMemoryRepository;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.context.annotation.Import;
@@ -34,7 +35,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
         DeepSeekChatAdapter.class,
         LlmAdapterController.class,
         AiConversationServiceImpl.class,
-        CommonTools.class
+        CommonTools.class,
+        NetDiskTools.class
 })
 @EnableJpaRepositories(basePackageClasses = LlmModelRepo.class)
 @EntityScan(basePackageClasses = LlmModel.class)

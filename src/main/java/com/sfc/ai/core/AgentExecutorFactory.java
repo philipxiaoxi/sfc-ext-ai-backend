@@ -6,6 +6,7 @@ import com.sfc.ai.service.AiConversationService;
 import com.sfc.ai.service.LlmModelService;
 import com.sfc.ai.service.LlmProviderService;
 import com.sfc.ai.tool.CommonTools;
+import com.sfc.ai.tool.NetDiskTools;
 
 /**
  * {@link AgentExecutor} 工厂，将 AgentExecutor 的依赖注入与创建逻辑封装在一起。
@@ -20,19 +21,22 @@ public class AgentExecutorFactory {
     private final LlmChatAdapterRegistry adapterRegistry;
     private final AiConversationService aiConversationService;
     private final CommonTools commonTools;
+    private final NetDiskTools netDiskTools;
 
     public AgentExecutorFactory(LlmModelService llmModelService,
                                  ChatClientService chatClientService,
                                  LlmProviderService llmProviderService,
                                  LlmChatAdapterRegistry adapterRegistry,
                                  AiConversationService aiConversationService,
-                                 CommonTools commonTools) {
+                                 CommonTools commonTools,
+                                 NetDiskTools netDiskTools) {
         this.llmModelService = llmModelService;
         this.chatClientService = chatClientService;
         this.llmProviderService = llmProviderService;
         this.adapterRegistry = adapterRegistry;
         this.aiConversationService = aiConversationService;
         this.commonTools = commonTools;
+        this.netDiskTools = netDiskTools;
     }
 
     /**
@@ -49,7 +53,8 @@ public class AgentExecutorFactory {
                 llmProviderService,
                 adapterRegistry,
                 aiConversationService,
-                commonTools
+                commonTools,
+                netDiskTools
         );
     }
 }
