@@ -208,6 +208,7 @@ public class NetDiskTools {
                 .queryParam("targetId", resourceRequest.getTargetId())
                 .queryParam("path", resourceRequest.getPath())
                 .queryParam("name", resourceRequest.getName())
+                .encode()
                 .buildAndExpand(uid)
                 .toUriString();
     }
