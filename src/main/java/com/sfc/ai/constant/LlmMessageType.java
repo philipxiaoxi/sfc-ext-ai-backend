@@ -28,6 +28,9 @@ public enum LlmMessageType {
     /**已停止回应标记 */
     DONE,
 
+    /** 工具注册确认 */
+    REGISTER_TOOL_ACK,
+
     /** 错误 */
     ERROR
 }

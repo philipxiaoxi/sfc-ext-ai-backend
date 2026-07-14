@@ -233,6 +233,8 @@ public class AgentExecutor {
                 request.getData(), RegisterToolPayload.class);
         registeredTools.put(payload.getName(),
                 new RegisteredTool(payload.getName(), payload.getDescription(), payload.getParameters()));
+        log.debug("通过 MessageChannel 注册工具: {}", payload.getName());
+        channel.send(LlmMessageType.REGISTER_TOOL_ACK, payload.getName());
     }
 
     private void handleToolAck(UserRequest request) {

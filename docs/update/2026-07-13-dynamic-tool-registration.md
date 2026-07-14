@@ -41,10 +41,8 @@
 
 ```json
 {
-  "type": "TEXT",
-  "data": {
-    "content": "工具已注册: get_weather"
-  }
+  "type": "REGISTER_TOOL_ACK",
+  "data": "get_weather"
 }
 ```
 
@@ -106,7 +104,7 @@
   |<--- SESSION_ACK {sessionId} ----------------------------|
   |                                                           |
   |--- REGISTER_TOOL {name, description, parameters} ------->|
-  |<--- TEXT "工具已注册: get_weather" ----------------------|
+   |<--- REGISTER_TOOL_ACK "get_weather" --------------------|
   |                                                           |
   |--- CHAT {modelId, content: "北京天气如何？"} ----------->|
   |                                                           |
@@ -145,7 +143,8 @@
 
 ## 三、前端适配 checklist
 
-- [ ] 新增对 `UserMessageType.REGISTER_TOOL` 消息的发送支持，允许用户在 `CHAT` 前注册自定工具
+- [ ] 新增对 `UserMessageType.REGISTER_TOOL` 消息的发送支持，允许用户在 `CHAT` 前注册自定义工具
+- [ ] 新增对 `LlmMessageType.REGISTER_TOOL_ACK` 的监听处理，注册成功后 `data` 为工具名称字符串（非 JSON 对象，需直接取值）
 - [ ] 新增对 `LlmMessageType.TOOL_CALL_REQ` 的监听处理
 - [ ] 收到 `TOOL_CALL_REQ` 后，根据 `name` 和 `arguments` 执行对应操作（如调外部 API、弹窗让用户手动输入等）
 - [ ] 执行完成后，发送 `TOOL_ACK` 消息并将 `id`、`name`、`arguments`、`result` 完整传回
