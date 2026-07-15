@@ -37,17 +37,4 @@ public class CommonTools {
         }
         return "ok";
     }
-
-    /**
-     * 列出公共网盘的文件列表
-     * @param path  目录路径
-     */
-    @Tool(description = "列出公共网盘的文件列表")
-    public List<FileInfo> listPublicNetDiskFiles(@ToolParam(description = "查询的网盘路径，以字符 '/' 开头和作为分隔符") String path) throws IOException {
-        List<FileInfo>[] userFileList = diskFileSystemManager.getMainFileSystem().getUserFileList(UserConstants.PUBLIC_USER_ID, path);
-        return Stream.concat(
-                userFileList[0].stream(),
-                userFileList[1].stream()
-        ).toList();
-    }
 }
