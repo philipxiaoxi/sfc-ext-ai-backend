@@ -87,7 +87,12 @@ public class AiConversationServiceImpl extends CrudServiceImpl<AiConversation, A
                     result.add(HistoryMessageVo.user(mem.getContent()));
 
                 case ASSISTANT -> {
-                    // 1) 提取工具调用条目
+                    // 1) 先输出 AI 正文与思考内容
+                    if (StringUtils.hasText(mem.getContent()) || StringUtils.hasText(mem.getReasoningContent())) {
+                        result.add(HistoryMessageVo.ai(mem.getContent(), mem.getReasoningContent()));
+                    }
+
+                    // 2) 再输出工具调用条目
                     if (StringUtils.hasText(mem.getToolCallData())) {
                         List<AssistantMessage.ToolCall> toolCalls = parseToolCallData(mem.getToolCallData());
                         if (toolCalls != null) {
@@ -98,11 +103,6 @@ public class AiConversationServiceImpl extends CrudServiceImpl<AiConversation, A
                                 result.add(entry);
                             }
                         }
-                    }
-
-                    // 2) 提取 AI 正文与思考内容
-                    if (StringUtils.hasText(mem.getContent()) || StringUtils.hasText(mem.getReasoningContent())) {
-                        result.add(HistoryMessageVo.ai(mem.getContent(), mem.getReasoningContent()));
                     }
                 }
 
