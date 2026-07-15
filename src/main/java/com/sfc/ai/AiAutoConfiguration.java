@@ -1,20 +1,21 @@
 package com.sfc.ai;
 
+import com.sfc.ai.config.AiWebSocketConfig;
 import com.sfc.ai.controller.*;
+import com.sfc.ai.core.AgentExecutorFactory;
+import com.sfc.ai.core.ChatClientService;
 import com.sfc.ai.core.adapter.DeepSeekChatAdapter;
 import com.sfc.ai.core.adapter.LlmChatAdapterRegistry;
 import com.sfc.ai.core.adapter.OpenAiChatAdapter;
-import com.sfc.ai.config.AiWebSocketConfig;
+import com.sfc.ai.core.memory.JpaChatMemoryRepository;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.repo.LlmModelRepo;
-import com.sfc.ai.core.AgentExecutorFactory;
-import com.sfc.ai.core.ChatClientService;
+import com.sfc.ai.service.impl.AiChatMemoryServiceImpl;
 import com.sfc.ai.service.impl.AiConversationServiceImpl;
 import com.sfc.ai.service.impl.LlmModelServiceImpl;
 import com.sfc.ai.service.impl.LlmProviderServiceImpl;
 import com.sfc.ai.tool.CommonTools;
 import com.sfc.ai.tool.NetDiskTools;
-import com.sfc.ai.core.memory.JpaChatMemoryRepository;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
@@ -27,6 +28,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
         LlmQueryController.class,
         ChatClientService.class,
         AiWebSocketConfig.class,
+        AiChatMemoryServiceImpl.class,
         AgentExecutorFactory.class,
         AiChatWebSocketHandler.class,
         JpaChatMemoryRepository.class,
@@ -34,6 +36,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
         OpenAiChatAdapter.class,
         DeepSeekChatAdapter.class,
         LlmAdapterController.class,
+        AiConversationController.class,
         AiConversationServiceImpl.class,
         CommonTools.class,
         NetDiskTools.class
