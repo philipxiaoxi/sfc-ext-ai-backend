@@ -5,13 +5,16 @@ import com.sfc.ai.core.adapter.LlmChatAdapterRegistry;
 import com.sfc.ai.core.advisor.MessageConvertAdvisor;
 import com.sfc.ai.core.advisor.SfcChatMemoryAdvisor;
 import com.sfc.ai.core.memory.SfcChatMemory;
+import com.sfc.ai.core.tool.FallbackToolCallbackResolver;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.model.po.LlmProvider;
 import com.sfc.ai.tool.CommonTools;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.ToolCallingAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.model.tool.ToolCallingManager;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -50,13 +53,21 @@ public class ChatClientService {
      * @return 配置完成的 ChatClient 实例
      */
     public ChatClient getChatClient(LlmProvider llmProvider, LlmModel model, String conversationId,
-                                     LlmChatAdapter adapter,
-                                     Consumer<ChatClient.Builder> builderConsumer) {
+                                      LlmChatAdapter adapter,
+                                      Consumer<ChatClient.Builder> builderConsumer) {
         ChatModel chatModel = adapterRegistry.getAdapter(llmProvider.getAdapter())
                 .createChatModel(llmProvider, model);
 
+        ToolCallingAdvisor toolCallingAdvisor = ToolCallingAdvisor.builder()
+                .toolCallingManager(ToolCallingManager.builder()
+                        .toolCallbackResolver(new FallbackToolCallbackResolver())
+                        .build())
+                .conversationHistoryEnabled(false)
+                .build();
+
         ChatClient.Builder builder = ChatClient.builder(chatModel)
                 .defaultAdvisors(
+                        toolCallingAdvisor,
                         new SfcChatMemoryAdvisor(adapter, SfcChatMemory.builder()
                                 .chatMemoryRepository(chatMemoryRepository)
                                 .build()),
