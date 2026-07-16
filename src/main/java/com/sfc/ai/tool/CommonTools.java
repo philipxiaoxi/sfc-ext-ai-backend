@@ -23,12 +23,12 @@ public class CommonTools {
     /**
      * 获取当前时间
      */
-    @Tool(description = "获取当前时间")
+    @Tool(name = "get_now_time", description = "获取当前时间")
     public String getNowTime() {
         return LocalDateTime.now().toString();
     }
 
-    @Tool(description = "让 AI 等待指定的毫秒数")
+    @Tool(name = "sleep", description = "让 AI 等待指定的毫秒数")
     public String sleep(@ToolParam(description = "等待的毫秒") long milliseconds) {
         try {
             Thread.sleep(milliseconds);

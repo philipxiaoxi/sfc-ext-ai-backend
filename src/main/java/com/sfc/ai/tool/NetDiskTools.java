@@ -85,7 +85,7 @@ public class NetDiskTools {
      * @param maxResults 最大返回结果条数
      * @return 文件搜索结果列表，包含网盘类型、完整路径、文件大小和文件名
      */
-    @Tool(description = "在网盘中搜索文件，支持递归子目录和文件名正则匹配")
+    @Tool(name = "search_files", description = "在网盘中搜索文件，支持递归子目录和文件名正则匹配")
     public List<FileSearchResult> searchFiles(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "搜索的起始目录路径，以 '/' 开头和作为分隔符") String path,
@@ -134,7 +134,7 @@ public class NetDiskTools {
      * @param path 目录路径，以字符 '/' 开头和作为分隔符
      * @return 文件和目录的合并列表
      */
-    @Tool(description = "列出网盘文件列表")
+    @Tool(name = "list_files", description = "列出网盘文件列表")
     public List<FileInfo> listFiles(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "查询的网盘路径，以字符 '/' 开头和作为分隔符") String path) throws IOException {
@@ -152,7 +152,7 @@ public class NetDiskTools {
      * @param newName 新文件名或目录名
      * @return 操作结果消息
      */
-    @Tool(description = "重命名网盘文件或目录")
+    @Tool(name = "rename", description = "重命名网盘文件或目录")
     public String rename(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "文件或目录所在的父目录路径") String path,
@@ -175,7 +175,7 @@ public class NetDiskTools {
      * @param name 要删除的文件名或目录名
      * @return 操作结果消息
      */
-    @Tool(description = "删除网盘文件或目录。目录下存在子文件或目录时也能直接删除。对于挂载点则是直接移除挂载点。")
+    @Tool(name = "delete", description = "删除网盘文件或目录。目录下存在子文件或目录时也能直接删除。对于挂载点则是直接移除挂载点。")
     public String delete(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "文件或目录所在的父目录路径") String path,
@@ -200,7 +200,7 @@ public class NetDiskTools {
      * @param overwrite   是否覆盖目标路径下的同名文件
      * @return 操作结果消息
      */
-    @Tool(description = "移动网盘文件或目录，支持公共网盘与私人网盘之间的双向移动")
+    @Tool(name = "move", description = "移动网盘文件或目录，支持公共网盘与私人网盘之间的双向移动")
     public String move(
             @ToolParam(description = "源网盘类型，'public' 或 'private'") String sourceDisk,
             @ToolParam(description = "源文件或目录所在的父目录路径") String sourcePath,
@@ -229,7 +229,7 @@ public class NetDiskTools {
      * @param overwrite   是否覆盖目标路径下的同名文件
      * @return 操作结果消息
      */
-    @Tool(description = "复制网盘文件，支持公共网盘与私人网盘之间的双向复制")
+    @Tool(name = "copy", description = "复制网盘文件，支持公共网盘与私人网盘之间的双向复制")
     public String copy(
             @ToolParam(description = "源网盘类型，'public' 或 'private'") String sourceDisk,
             @ToolParam(description = "源目录路径") String sourcePath,
@@ -263,7 +263,7 @@ public class NetDiskTools {
      * @param path 要创建的目录路径，以字符 '/' 开头和作为分隔符
      * @return 操作结果消息
      */
-    @Tool(description = "递归创建网盘目录（类似 mkdir -p），父级目录不存在时也会一并创建")
+    @Tool(name = "mkdirs", description = "递归创建网盘目录（类似 mkdir -p），父级目录不存在时也会一并创建")
     public String mkdirs(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "要创建的目录路径，以字符 '/' 开头和作为分隔符") String path) {
@@ -284,7 +284,7 @@ public class NetDiskTools {
      * @param name 文件名
      * @return 下载链接（以 / 开头）
      */
-    @Tool(description = "获取网盘文件的下载链接，返回以 '/' 开头的路径")
+    @Tool(name = "get_download_link", description = "获取网盘文件的下载链接，返回以 '/' 开头的路径")
     public String getDownloadLink(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "文件所在的目录路径，以字符 '/' 开头和作为分隔符") String path,
@@ -386,7 +386,7 @@ public class NetDiskTools {
      * @param endLine   结束行号（包含）
      * @return 行号与行内容的二元组列表，如 [[1, "第一行内容\n"], [2, "第二行内容"]]
      */
-    @Tool(description = "读取网盘文本文件按行号范围读取内容，建议每次读取不超过200行（推荐按 startLine~endLine 分段读取），每次读取范围不能超过1000行")
+    @Tool(name = "read_text_file", description = "读取网盘文本文件按行号范围读取内容，建议每次读取不超过200行（推荐按 startLine~endLine 分段读取），每次读取范围不能超过1000行")
     public List<Object[]> readTextFile(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "文件所在目录路径，以 '/' 开头和作为分隔符") String path,
@@ -444,7 +444,7 @@ public class NetDiskTools {
      * @param content 要写入的完整文本内容
      * @return 操作结果消息
      */
-    @Tool(description = "全覆盖写入网盘文本文件，文件不存在则自动创建")
+    @Tool(name = "write_text_file", description = "全覆盖写入网盘文本文件，文件不存在则自动创建")
     public String writeTextFile(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "文件所在目录路径，以 '/' 开头和作为分隔符") String path,
@@ -478,7 +478,7 @@ public class NetDiskTools {
      * @param lineNumber 插入到该行之前，从1开始；若为总行数+1则追加到文件末尾
      * @return 操作结果消息
      */
-    @Tool(description = "在网盘文本文件的指定行号前插入新内容")
+    @Tool(name = "insert_text_line", description = "在网盘文本文件的指定行号前插入新内容")
     public String insertTextLine(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "文件所在目录路径，以 '/' 开头和作为分隔符") String path,
@@ -534,7 +534,7 @@ public class NetDiskTools {
      * @param endLine   结束行号（包含）
      * @return 操作结果消息
      */
-    @Tool(description = "替换网盘文本文件指定行号范围内的内容")
+    @Tool(name = "replace_text_lines", description = "替换网盘文本文件指定行号范围内的内容")
     public String replaceTextLines(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "文件所在目录路径，以 '/' 开头和作为分隔符") String path,
