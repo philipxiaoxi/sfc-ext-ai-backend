@@ -16,6 +16,7 @@ import com.sfc.ai.service.impl.LlmModelServiceImpl;
 import com.sfc.ai.service.impl.LlmProviderServiceImpl;
 import com.sfc.ai.tool.CommonTools;
 import com.sfc.ai.tool.NetDiskTools;
+import com.sfc.ai.tool.TextSearchTools;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
@@ -39,7 +40,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
         AiConversationController.class,
         AiConversationServiceImpl.class,
         CommonTools.class,
-        NetDiskTools.class
+        NetDiskTools.class,
+        TextSearchTools.class
 })
 @EnableJpaRepositories(basePackageClasses = LlmModelRepo.class)
 @EntityScan(basePackageClasses = LlmModel.class)

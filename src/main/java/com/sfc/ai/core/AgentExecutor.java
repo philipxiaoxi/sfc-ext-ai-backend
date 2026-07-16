@@ -22,6 +22,7 @@ import com.sfc.ai.model.chat.payload.RegisterToolPayload;
 import com.sfc.ai.model.chat.payload.ToolCallAckPayload;
 import com.sfc.ai.tool.CommonTools;
 import com.sfc.ai.tool.NetDiskTools;
+import com.sfc.ai.tool.TextSearchTools;
 import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
 import com.xiaotao.saltedfishcloud.utils.StringUtils;
 import org.springframework.ai.support.ToolCallbacks;
@@ -61,6 +62,7 @@ public class AgentExecutor {
     private final AiConversationService aiConversationService;
     private final CommonTools commonTools;
     private final NetDiskTools netDiskTools;
+    private final TextSearchTools textSearchTools;
 
     private final Map<String, ChannelMediatedToolCallback> registeredTools = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CompletableFuture<String>> pendingToolCalls = new ConcurrentHashMap<>();
@@ -76,7 +78,8 @@ public class AgentExecutor {
                           LlmChatAdapterRegistry adapterRegistry,
                           AiConversationService aiConversationService,
                           CommonTools commonTools,
-                          NetDiskTools netDiskTools) {
+                          NetDiskTools netDiskTools,
+                          TextSearchTools textSearchTools) {
         this.channel = channel;
         this.llmModelService = llmModelService;
         this.chatClientService = chatClientService;
@@ -85,6 +88,7 @@ public class AgentExecutor {
         this.aiConversationService = aiConversationService;
         this.commonTools = commonTools;
         this.netDiskTools = netDiskTools;
+        this.textSearchTools = textSearchTools;
         channel.onMessage(this::dispatch);
         channel.onClose(this::onChannelClosed);
     }
@@ -182,7 +186,7 @@ public class AgentExecutor {
         for (ChannelMediatedToolCallback callback : registeredTools.values()) {
             allTools.add(new SfcAgentToolCallbackDecorator(callback, channel, currentUser));
         }
-        for (ToolCallback callback : ToolCallbacks.from(commonTools, netDiskTools)) {
+        for (ToolCallback callback : ToolCallbacks.from(commonTools, netDiskTools, textSearchTools)) {
             allTools.add(new SfcAgentToolCallbackDecorator(callback, channel, currentUser));
         }
         ChatClient chatClient = chatClientService.getChatClient(
