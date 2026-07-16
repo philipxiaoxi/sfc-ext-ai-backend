@@ -4,6 +4,7 @@ import com.sfc.ai.core.adapter.LlmChatAdapter;
 import com.sfc.ai.core.adapter.LlmChatAdapterRegistry;
 import com.sfc.ai.core.advisor.MessageConvertAdvisor;
 import com.sfc.ai.core.advisor.SfcChatMemoryAdvisor;
+import com.sfc.ai.core.memory.JpaChatMemoryRepository;
 import com.sfc.ai.core.memory.SfcChatMemory;
 import com.sfc.ai.core.tool.FallbackToolCallbackResolver;
 import com.sfc.ai.model.po.LlmModel;
@@ -12,7 +13,6 @@ import com.sfc.ai.tool.CommonTools;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.ToolCallingAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.model.tool.ToolCallingManager;
 
@@ -26,13 +26,13 @@ import java.util.function.Consumer;
  */
 public class ChatClientService {
 
-    private final ChatMemoryRepository chatMemoryRepository;
+    private final JpaChatMemoryRepository chatMemoryRepository;
 
     private final LlmChatAdapterRegistry adapterRegistry;
 
     private final CommonTools commonTools;
 
-    public ChatClientService(ChatMemoryRepository chatMemoryRepository,
+    public ChatClientService(JpaChatMemoryRepository chatMemoryRepository,
                               LlmChatAdapterRegistry adapterRegistry,
                               CommonTools commonTools) {
         this.chatMemoryRepository = chatMemoryRepository;

@@ -30,16 +30,30 @@ public class JpaChatMemoryRepository implements ChatMemoryRepository {
     }
 
     @Override
-    public List<String> findConversationIds() {
+    public @NonNull List<String> findConversationIds() {
         return aiChatMemoryRepo.findDistinctConversationIds();
     }
 
     @Override
-    public List<Message> findByConversationId(String conversationId) {
+    public @NonNull List<Message> findByConversationId(@NonNull String conversationId) {
         return aiChatMemoryRepo.findByConversationIdOrderById(conversationId)
                 .stream()
                 .map(this::toMessage)
                 .toList();
+    }
+
+    /**
+     * 增量添加消息到指定会话（只插入，不删除已有消息）。
+     *
+     * @param conversationId 会话 ID
+     * @param messages       待添加的消息列表
+     */
+    @Transactional
+    public void add(@NonNull String conversationId, List<Message> messages) {
+        List<AiChatMemory> entities = messages.stream()
+                .map(msg -> toEntity(conversationId, msg))
+                .toList();
+        aiChatMemoryRepo.saveAll(entities);
     }
 
     @Override
