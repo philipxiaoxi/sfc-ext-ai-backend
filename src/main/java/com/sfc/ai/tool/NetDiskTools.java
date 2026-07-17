@@ -472,7 +472,7 @@ public class NetDiskTools {
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "文件所在目录路径，以 '/' 开头和作为分隔符") String path,
             @ToolParam(description = "文件名") String name,
-            @ToolParam(description = "替换后的文本内容") String content,
+            @ToolParam(description = "替换后的文本内容。注意：替换后不会自动在末尾添加换行符") String content,
             @ToolParam(description = "起始行号（从1开始）") Integer startLine,
             @ToolParam(description = "结束行号（包含）") Integer endLine) {
         try {
