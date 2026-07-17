@@ -1,12 +1,9 @@
 package com.sfc.ai.tool;
 
 import com.xiaotao.saltedfishcloud.constant.UserConstants;
-import com.xiaotao.saltedfishcloud.service.file.DiskFileSystem;
 import com.xiaotao.saltedfishcloud.utils.SecureUtils;
-import com.xiaotao.saltedfishcloud.utils.StringUtils;
 import org.springframework.core.io.Resource;
 
-import java.io.IOException;
 import java.io.InputStream;
 
 /**
@@ -41,21 +38,13 @@ public final class NetDiskToolUtils {
 
     /**
      * 校验文件是否为纯文本文件。通过读取文件头部字节检测是否存在 NUL 字节来判断。
-     * 若文件不存在则跳过校验（可能为新建文件）。
+     * 若资源为 null 则跳过校验（可能为新建文件）。
      *
-     * @param fs   文件系统实例
-     * @param uid  用户 ID
-     * @param path 文件所在目录路径
-     * @param name 文件名
+     * @param resource    文件资源，可为 null
+     * @param displayPath 用于错误提示的文件路径
      * @throws IllegalArgumentException 当文件不是纯文本文件时抛出
      */
-    public static void validateTextFile(DiskFileSystem fs, long uid, String path, String name) {
-        Resource resource;
-        try {
-            resource = fs.getResource(uid, path, name);
-        } catch (IOException e) {
-            throw new RuntimeException("无法读取文件: " + StringUtils.appendPath(path, name), e);
-        }
+    public static void validateTextFile(Resource resource, String displayPath) {
         if (resource == null) {
             return;
         }
@@ -63,7 +52,7 @@ public final class NetDiskToolUtils {
             byte[] buffer = new byte[8192];
             int bytesRead = is.read(buffer);
             if (bytesRead > 0 && containsNullByte(buffer, bytesRead)) {
-                throw new IllegalArgumentException("不是纯文本文件: " + StringUtils.appendPath(path, name));
+                throw new IllegalArgumentException("不是纯文本文件: " + displayPath);
             }
         } catch (IllegalArgumentException e) {
             throw e;

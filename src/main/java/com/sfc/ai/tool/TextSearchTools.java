@@ -5,6 +5,7 @@ import com.xiaotao.saltedfishcloud.service.file.DiskFileSystem;
 import com.xiaotao.saltedfishcloud.service.file.DiskFileSystemManager;
 import com.xiaotao.saltedfishcloud.utils.DiskFileSystemUtils;
 import com.xiaotao.saltedfishcloud.utils.ResourceUtils;
+import com.xiaotao.saltedfishcloud.utils.StringUtils;
 import org.jspecify.annotations.NonNull;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -120,7 +121,8 @@ public class TextSearchTools {
                 parentPath = lastSlash >= 0 ? fullPath.substring(0, Math.max(lastSlash, 1)) : "/";
 
                 try {
-                    NetDiskToolUtils.validateTextFile(getFileSystem(), uid, parentPath, file.getName());
+                    Resource fileResource = getFileSystem().getResource(uid, parentPath, file.getName());
+                    NetDiskToolUtils.validateTextFile(fileResource, StringUtils.appendPath(parentPath, file.getName()));
                 } catch (Exception e) {
                     return FileVisitResult.CONTINUE;
                 }

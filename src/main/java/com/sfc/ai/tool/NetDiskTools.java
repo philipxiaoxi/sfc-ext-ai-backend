@@ -327,7 +327,12 @@ public class NetDiskTools {
             @ToolParam(description = "起始行号（从1开始）") Integer startLine,
             @ToolParam(description = "结束行号（包含，推荐 startLine 与 endLine 间隔不超过200行）") Integer endLine) throws IOException {
         long uid = NetDiskToolUtils.resolveUid(disk);
-        NetDiskToolUtils.validateTextFile(getFileSystem(), uid, path, name);
+        Resource resource = getFileSystem().getResource(uid, path, name);
+        NetDiskToolUtils.validateTextFile(resource, StringUtils.appendPath(path, name));
+
+        if (resource == null) {
+            throw new IllegalArgumentException("文件不存在: " + StringUtils.appendPath(path, name));
+        }
 
         if (startLine == null || startLine < 1) {
             throw new IllegalArgumentException("startLine 必须大于等于1");
@@ -337,11 +342,6 @@ public class NetDiskTools {
         }
         if (endLine - startLine + 1 > 1000) {
             throw new IllegalArgumentException("读取行数范围不能超过1000行");
-        }
-
-        Resource resource = getFileSystem().getResource(uid, path, name);
-        if (resource == null) {
-            throw new IllegalArgumentException("文件不存在: " + StringUtils.appendPath(path, name));
         }
 
         String content = ResourceUtils.resourceToString(resource);
@@ -385,11 +385,14 @@ public class NetDiskTools {
             @ToolParam(description = "要写入的完整文本内容") String content) {
         try {
             long uid = NetDiskToolUtils.resolveUid(disk);
-            NetDiskToolUtils.validateTextFile(getFileSystem(), uid, path, name);
+            NetDiskToolUtils.validateTextFile(getFileSystem().getResource(uid, path, name), StringUtils.appendPath(path, name));
 
             FileInfo fileInfo = new FileInfo();
+            long now = System.currentTimeMillis();
             fileInfo.setName(name);
             fileInfo.setUid(uid);
+            fileInfo.setCtime(now);
+            fileInfo.setMtime(now);
             byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
             fileInfo.setSize((long) bytes.length);
             fileInfo.setStreamSource(() -> new ByteArrayInputStream(bytes));
@@ -420,7 +423,8 @@ public class NetDiskTools {
             @ToolParam(description = "插入到该行之前（从1开始），若为总行数+1则追加到文件末尾") Integer lineNumber) {
         try {
             long uid = NetDiskToolUtils.resolveUid(disk);
-            NetDiskToolUtils.validateTextFile(getFileSystem(), uid, path, name);
+            Resource resource = getFileSystem().getResource(uid, path, name);
+            NetDiskToolUtils.validateTextFile(resource, StringUtils.appendPath(path, name));
             if (lineNumber == null || lineNumber < 1) {
                 return "插入失败: lineNumber 必须大于等于1";
             }
@@ -443,10 +447,26 @@ public class NetDiskTools {
                 sb.append(content);
             }
 
+            Long originalCtime = null;
+            if (resource != null) {
+                List<FileInfo> existingFiles = getFileSystem().getUserFileList(uid, path, Collections.singletonList(name));
+                if (existingFiles != null) {
+                    for (FileInfo f : existingFiles) {
+                        if (f.isFile()) {
+                            originalCtime = f.getCtime();
+                            break;
+                        }
+                    }
+                }
+            }
+
             byte[] bytes = sb.toString().getBytes(StandardCharsets.UTF_8);
             FileInfo fileInfo = new FileInfo();
+            long now = System.currentTimeMillis();
             fileInfo.setName(name);
             fileInfo.setUid(uid);
+            fileInfo.setCtime(originalCtime != null ? originalCtime : now);
+            fileInfo.setMtime(now);
             fileInfo.setSize((long) bytes.length);
             fileInfo.setStreamSource(() -> new ByteArrayInputStream(bytes));
             getFileSystem().saveFileByStream(fileInfo, path, os -> DiskFileSystemUtils.saveFile(fileInfo, os));
@@ -477,7 +497,8 @@ public class NetDiskTools {
             @ToolParam(description = "结束行号（包含）") Integer endLine) {
         try {
             long uid = NetDiskToolUtils.resolveUid(disk);
-            NetDiskToolUtils.validateTextFile(getFileSystem(), uid, path, name);
+            Resource resource = getFileSystem().getResource(uid, path, name);
+            NetDiskToolUtils.validateTextFile(resource, StringUtils.appendPath(path, name));
             if (startLine == null || startLine < 1) {
                 return "替换失败: startLine 必须大于等于1";
             }
@@ -506,10 +527,26 @@ public class NetDiskTools {
                 }
             }
 
+            Long originalCtime = null;
+            if (resource != null) {
+                List<FileInfo> existingFiles = getFileSystem().getUserFileList(uid, path, Collections.singletonList(name));
+                if (existingFiles != null) {
+                    for (FileInfo f : existingFiles) {
+                        if (f.isFile()) {
+                            originalCtime = f.getCtime();
+                            break;
+                        }
+                    }
+                }
+            }
+
             byte[] bytes = sb.toString().getBytes(StandardCharsets.UTF_8);
             FileInfo fileInfo = new FileInfo();
+            long now = System.currentTimeMillis();
             fileInfo.setName(name);
             fileInfo.setUid(uid);
+            fileInfo.setCtime(originalCtime != null ? originalCtime : now);
+            fileInfo.setMtime(now);
             fileInfo.setSize((long) bytes.length);
             fileInfo.setStreamSource(() -> new ByteArrayInputStream(bytes));
             getFileSystem().saveFileByStream(fileInfo, path, os -> DiskFileSystemUtils.saveFile(fileInfo, os));
