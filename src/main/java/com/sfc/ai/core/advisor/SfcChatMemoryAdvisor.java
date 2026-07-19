@@ -1,6 +1,7 @@
 package com.sfc.ai.core.advisor;
 
 import com.sfc.ai.core.adapter.LlmChatAdapter;
+import com.sfc.ai.core.memory.ChatMemoryRepairer;
 import com.sfc.ai.core.message.ReasoningAssistantMessage;
 import com.xiaotao.saltedfishcloud.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +15,7 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.util.Assert;
@@ -23,6 +25,7 @@ import reactor.core.publisher.Mono;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -74,10 +77,20 @@ public class SfcChatMemoryAdvisor extends SfcBaseAdvisor implements BaseChatMemo
         this.messageBuilder.reset();
 
         // 1. Retrieve the chat memory for the current conversation.
-        List<Message> memoryMessages = chatMemory.get(conversationId);
+        // 加载记忆后先做内存级完整性修复：为被 STOP/连接关闭中断而悬空的 assistant(toolCalls)
+        // 补插“已中断”占位 tool 结果消息，避免后续请求被 LLM API 以 400 拒绝。
+        // prompt 中即将随本轮工具循环发送、但尚未落库的真实工具结果视为已覆盖，不做重复补偿。
+        List<Message> promptMessages = chatClientRequest.prompt().getInstructions();
+        Set<String> promptToolResultIds = promptMessages.stream()
+                .filter(ToolResponseMessage.class::isInstance)
+                .map(ToolResponseMessage.class::cast)
+                .flatMap(trm -> trm.getResponses().stream())
+                .map(ToolResponseMessage.ToolResponse::id)
+                .collect(Collectors.toSet());
+        List<Message> memoryMessages = ChatMemoryRepairer.repairInMemory(
+                chatMemory.get(conversationId), promptToolResultIds);
 
         // 2. Advise the request messages list.
-        List<Message> promptMessages = chatClientRequest.prompt().getInstructions();
         List<Message> processedMessages = new ArrayList<>();
         if (!isMemoryAlreadyInPrompt(promptMessages, memoryMessages)) {
             processedMessages.addAll(memoryMessages);

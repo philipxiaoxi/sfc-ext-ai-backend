@@ -2,6 +2,7 @@ package com.sfc.ai.core;
 
 import com.sfc.ai.core.adapter.LlmChatAdapterRegistry;
 import com.sfc.ai.core.channel.MessageChannel;
+import com.sfc.ai.core.memory.JpaChatMemoryRepository;
 import com.sfc.ai.service.AiConversationService;
 import com.sfc.ai.service.LlmModelService;
 import com.sfc.ai.service.LlmProviderService;
@@ -24,6 +25,7 @@ public class AgentExecutorFactory {
     private final CommonTools commonTools;
     private final NetDiskTools netDiskTools;
     private final TextSearchTools textSearchTools;
+    private final JpaChatMemoryRepository chatMemoryRepository;
 
     public AgentExecutorFactory(LlmModelService llmModelService,
                                  ChatClientService chatClientService,
@@ -32,7 +34,8 @@ public class AgentExecutorFactory {
                                  AiConversationService aiConversationService,
                                  CommonTools commonTools,
                                  NetDiskTools netDiskTools,
-                                 TextSearchTools textSearchTools) {
+                                 TextSearchTools textSearchTools,
+                                 JpaChatMemoryRepository chatMemoryRepository) {
         this.llmModelService = llmModelService;
         this.chatClientService = chatClientService;
         this.llmProviderService = llmProviderService;
@@ -41,6 +44,7 @@ public class AgentExecutorFactory {
         this.commonTools = commonTools;
         this.netDiskTools = netDiskTools;
         this.textSearchTools = textSearchTools;
+        this.chatMemoryRepository = chatMemoryRepository;
     }
 
     /**
@@ -59,7 +63,8 @@ public class AgentExecutorFactory {
                 aiConversationService,
                 commonTools,
                 netDiskTools,
-                textSearchTools
+                textSearchTools,
+                chatMemoryRepository
         );
     }
 }
