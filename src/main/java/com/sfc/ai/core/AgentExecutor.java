@@ -20,6 +20,7 @@ import com.sfc.ai.core.memory.JpaChatMemoryRepository;
 import com.sfc.ai.core.tool.ChannelMediatedToolCallback;
 import com.sfc.ai.core.tool.RegisteredTool;
 import com.sfc.ai.core.tool.SfcAgentToolCallbackDecorator;
+import com.sfc.ai.core.tool.ToolExecution;
 import com.sfc.ai.model.chat.payload.RegisterToolPayload;
 import com.sfc.ai.model.chat.payload.ToolCallAckPayload;
 import com.sfc.ai.tool.CommonTools;
@@ -48,7 +49,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -77,13 +77,14 @@ public class AgentExecutor {
     private final Map<String, ChannelMediatedToolCallback> registeredTools = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CompletableFuture<String>> pendingToolCalls = new ConcurrentHashMap<>();
 
-    /** 进行中的内建工具调用 Future 注册表，key 为工具调用 ID，供 STOP 硬中断 */
-    private final ConcurrentHashMap<String, Future<?>> runningToolFutures = new ConcurrentHashMap<>();
+    /** 进行中的工具调用注册表，key 为工具调用 ID，value 为执行记录（含 Future、调用 ID、工具名）。
+     * 装饰器与 {@link #handleStop()} 通过原子 {@code remove} 仲裁 {@link LlmMessageType#TOOL_CALL_END} 的发送归属 */
+    private final ConcurrentHashMap<String, ToolExecution> runningToolCalls = new ConcurrentHashMap<>();
 
     /** 内建工具执行的虚拟线程池（per-session），使工具调用可被 {@link Thread#interrupt()} 硬中断 */
     private final ExecutorService toolExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
-    /** 会话级 STOP 标志，true 时抑制错误通知与 {@link LlmMessageType#TOOL_CALL_END} 的发送 */
+    /** 会话级 STOP 标志，true 时抑制 Flux 管线的 {@code doOnError} 错误通知 */
     private final AtomicBoolean stopped = new AtomicBoolean(false);
 
     /** DONE 消息去重标志，保证 {@link LlmMessageType#DONE} 在正常完成与 STOP 间只发送一次 */
@@ -122,16 +123,29 @@ public class AgentExecutor {
      */
     private void onChannelClosed() {
         log.debug("消息通道已关闭，取消所有进行中的 AI 操作");
+
+        runningToolCalls.forEach((toolCallId, exec) -> {
+            if (exec.future().cancel(true)) {
+                runningToolCalls.remove(toolCallId);
+                ToolCallEndPayload payload = new ToolCallEndPayload();
+                payload.setId(exec.toolCallId());
+                payload.setName(exec.toolName());
+                payload.setStatus(ToolCallStatus.CANCELLED);
+                payload.setErrorMessage("连接已关闭，中断了工具调用");
+                channel.send(LlmMessageType.TOOL_CALL_END, payload);
+            }
+        });
+        runningToolCalls.clear();
+
+        pendingToolCalls.values().forEach(f -> f.cancel(true));
+        pendingToolCalls.clear();
+
         if (chatDisposable != null && !chatDisposable.isDisposed()) {
             chatDisposable.dispose();
         }
         if (titleFuture != null && !titleFuture.isDone()) {
             titleFuture.cancel(true);
         }
-        pendingToolCalls.values().forEach(f -> f.cancel(true));
-        pendingToolCalls.clear();
-        runningToolFutures.values().forEach(f -> f.cancel(true));
-        runningToolFutures.clear();
         toolExecutor.shutdownNow();
         compensateDanglingToolCalls();
         chatSession = null;
@@ -216,11 +230,11 @@ public class AgentExecutor {
         List<ToolCallback> allTools = new ArrayList<>();
         for (ChannelMediatedToolCallback callback : registeredTools.values()) {
             allTools.add(new SfcAgentToolCallbackDecorator(callback, channel, currentUser,
-                    toolExecutor, runningToolFutures, stopped));
+                    toolExecutor, runningToolCalls));
         }
         for (ToolCallback callback : ToolCallbacks.from(commonTools, netDiskTools, textSearchTools)) {
             allTools.add(new SfcAgentToolCallbackDecorator(callback, channel, currentUser,
-                    toolExecutor, runningToolFutures, stopped));
+                    toolExecutor, runningToolCalls));
         }
         ChatClient chatClient = chatClientService.getChatClient(
                 provider, model, chatSession.getSessionId(), adapter,
@@ -298,12 +312,34 @@ public class AgentExecutor {
     /**
      * 处理用户主动中断请求。
      * <p>
-     * 依次取消：LLM 响应流、异步标题生成、客户端中介工具调用、内建工具调用（硬中断），
-     * 补偿修复对话记忆中悬空的工具调用记录，
-     * 并通过 {@link #doneSent} CAS 去重确保只发送一次 {@link LlmMessageType#DONE}。
+     * 依次：
+     * <ol>
+     *   <li>对每个进行中的内建工具尝试 {@link Future#cancel(boolean)}，
+     *       若成功取消（工具仍在运行）则发送 {@link LlmMessageType#TOOL_CALL_END}(CANCELLED)</li>
+     *   <li>取消所有客户端中介工具调用</li>
+     *   <li>取消 LLM 响应流与异步标题生成</li>
+     *   <li>补偿修复对话记忆中悬空的工具调用记录</li>
+     *   <li>通过 {@link #doneSent} CAS 去重发送一次 {@link LlmMessageType#DONE} "已停止"</li>
+     * </ol>
      */
     private void handleStop() {
         stopped.set(true);
+
+        runningToolCalls.forEach((toolCallId, exec) -> {
+            if (exec.future().cancel(true)) {
+                runningToolCalls.remove(toolCallId);
+                ToolCallEndPayload payload = new ToolCallEndPayload();
+                payload.setId(exec.toolCallId());
+                payload.setName(exec.toolName());
+                payload.setStatus(ToolCallStatus.CANCELLED);
+                payload.setErrorMessage("用户中断了工具调用");
+                channel.send(LlmMessageType.TOOL_CALL_END, payload);
+            }
+        });
+        runningToolCalls.clear();
+
+        pendingToolCalls.values().forEach(f -> f.cancel(true));
+        pendingToolCalls.clear();
 
         if (chatDisposable != null && !chatDisposable.isDisposed()) {
             chatDisposable.dispose();
@@ -311,10 +347,6 @@ public class AgentExecutor {
         if (titleFuture != null && !titleFuture.isDone()) {
             titleFuture.cancel(true);
         }
-        pendingToolCalls.values().forEach(f -> f.cancel(true));
-        pendingToolCalls.clear();
-        runningToolFutures.values().forEach(f -> f.cancel(true));
-        runningToolFutures.clear();
         compensateDanglingToolCalls();
 
         if (doneSent.compareAndSet(false, true)) {
