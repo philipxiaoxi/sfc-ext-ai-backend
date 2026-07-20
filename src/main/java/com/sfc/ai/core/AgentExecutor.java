@@ -1,5 +1,6 @@
 package com.sfc.ai.core;
 
+import com.sfc.ai.core.advisor.ToolCallNotificationAdvisor;
 import com.sfc.ai.core.adapter.LlmChatAdapter;
 import com.sfc.ai.core.adapter.LlmChatAdapterRegistry;
 import com.sfc.ai.constant.LlmMessageType;
@@ -21,6 +22,7 @@ import com.sfc.ai.core.tool.ChannelMediatedToolCallback;
 import com.sfc.ai.core.tool.RegisteredTool;
 import com.sfc.ai.core.tool.SfcAgentToolCallbackDecorator;
 import com.sfc.ai.core.tool.ToolExecution;
+import com.sfc.ai.core.tool.ToolCallIdProvider;
 import com.sfc.ai.model.chat.payload.RegisterToolPayload;
 import com.sfc.ai.model.chat.payload.ToolCallAckPayload;
 import com.sfc.ai.tool.CommonTools;
@@ -227,18 +229,22 @@ public class AgentExecutor {
         doneSent.set(false);
 
         UserPrincipal currentUser = chatSession.getUser();
+        ToolCallIdProvider idProvider = new ToolCallIdProvider();
         List<ToolCallback> allTools = new ArrayList<>();
         for (ChannelMediatedToolCallback callback : registeredTools.values()) {
             allTools.add(new SfcAgentToolCallbackDecorator(callback, channel, currentUser,
-                    toolExecutor, runningToolCalls));
+                    toolExecutor, runningToolCalls, idProvider));
         }
         for (ToolCallback callback : ToolCallbacks.from(commonTools, netDiskTools, textSearchTools)) {
             allTools.add(new SfcAgentToolCallbackDecorator(callback, channel, currentUser,
-                    toolExecutor, runningToolCalls));
+                    toolExecutor, runningToolCalls, idProvider));
         }
         ChatClient chatClient = chatClientService.getChatClient(
                 provider, model, chatSession.getSessionId(), adapter,
-                builder -> builder.defaultTools(allTools.toArray()));
+                builder -> {
+                    builder.defaultAdvisors(new ToolCallNotificationAdvisor(channel, idProvider));
+                    builder.defaultTools(allTools.toArray());
+                });
 
         this.chatDisposable = chatClient.prompt(Prompt.builder()
                         .messages(SystemMessage.builder()
@@ -282,9 +288,7 @@ public class AgentExecutor {
                         channel.send(LlmMessageType.DONE, donePayload);
                     }
                 })
-                .subscribe(response -> {
-                    channel.send(response.getType(), response.getData());
-                });
+                .subscribe(response -> channel.send(response.getType(), response.getData()));
     }
 
     private void handleRegisterTool(UserRequest request) {
