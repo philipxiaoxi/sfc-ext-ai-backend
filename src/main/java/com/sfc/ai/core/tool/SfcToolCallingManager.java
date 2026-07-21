@@ -178,13 +178,20 @@ public class SfcToolCallingManager implements ToolCallingManager {
     }
 
     /**
-     * 一次性发送当前响应中所有工具调用的 {@link LlmMessageType#TOOL_CALL_START} 通知。
-     * 在任何工具执行之前调用，确保客户端第一时间收到全部工具调用开始通知。
+     * 一次性发送当前响应中所有工具调用的 {@link LlmMessageType#TOOL_CALL_START} 通知，
+     * 并将每个工具调用注册到 {@link ToolExecutionManager#announceToolCall}。
+     * <p>
+     * 在任何工具执行之前调用，确保：
+     * <ul>
+     *   <li>客户端第一时间收到全部工具调用开始通知</li>
+     *   <li>STOP 中断时即使工具尚未进入执行也能收到 CANCELLED 通知</li>
+     * </ul>
      *
      * @param toolCalls LLM 响应中的工具调用列表
      */
     private void notifyToolCallStarts(List<AssistantMessage.ToolCall> toolCalls) {
         for (AssistantMessage.ToolCall toolCall : toolCalls) {
+            executionManager.announceToolCall(toolCall.id(), toolCall.name());
             ToolCallStartPayload payload = new ToolCallStartPayload();
             payload.setId(toolCall.id());
             payload.setName(toolCall.name());
