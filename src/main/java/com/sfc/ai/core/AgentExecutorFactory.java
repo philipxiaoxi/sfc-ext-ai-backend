@@ -3,6 +3,7 @@ package com.sfc.ai.core;
 import com.sfc.ai.core.adapter.LlmChatAdapterRegistry;
 import com.sfc.ai.core.channel.MessageChannel;
 import com.sfc.ai.core.memory.JpaChatMemoryRepository;
+import com.sfc.ai.core.tool.ToolProvider;
 import com.sfc.ai.service.AiConversationService;
 import com.sfc.ai.service.LlmModelService;
 import com.sfc.ai.service.LlmProviderService;
@@ -22,28 +23,24 @@ public class AgentExecutorFactory {
     private final LlmProviderService llmProviderService;
     private final LlmChatAdapterRegistry adapterRegistry;
     private final AiConversationService aiConversationService;
-    private final CommonTools commonTools;
-    private final NetDiskTools netDiskTools;
-    private final TextSearchTools textSearchTools;
+    private final ToolProvider toolProvider;
     private final JpaChatMemoryRepository chatMemoryRepository;
 
     public AgentExecutorFactory(LlmModelService llmModelService,
-                                 ChatClientService chatClientService,
-                                 LlmProviderService llmProviderService,
-                                 LlmChatAdapterRegistry adapterRegistry,
-                                 AiConversationService aiConversationService,
-                                 CommonTools commonTools,
-                                 NetDiskTools netDiskTools,
-                                 TextSearchTools textSearchTools,
-                                 JpaChatMemoryRepository chatMemoryRepository) {
+                                  ChatClientService chatClientService,
+                                  LlmProviderService llmProviderService,
+                                  LlmChatAdapterRegistry adapterRegistry,
+                                  AiConversationService aiConversationService,
+                                  CommonTools commonTools,
+                                  NetDiskTools netDiskTools,
+                                  TextSearchTools textSearchTools,
+                                  JpaChatMemoryRepository chatMemoryRepository) {
         this.llmModelService = llmModelService;
         this.chatClientService = chatClientService;
         this.llmProviderService = llmProviderService;
         this.adapterRegistry = adapterRegistry;
         this.aiConversationService = aiConversationService;
-        this.commonTools = commonTools;
-        this.netDiskTools = netDiskTools;
-        this.textSearchTools = textSearchTools;
+        this.toolProvider = new ToolProvider(commonTools, netDiskTools, textSearchTools);
         this.chatMemoryRepository = chatMemoryRepository;
     }
 
@@ -61,9 +58,7 @@ public class AgentExecutorFactory {
                 llmProviderService,
                 adapterRegistry,
                 aiConversationService,
-                commonTools,
-                netDiskTools,
-                textSearchTools,
+                toolProvider,
                 chatMemoryRepository
         );
     }

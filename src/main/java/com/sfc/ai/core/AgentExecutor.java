@@ -1,37 +1,27 @@
 package com.sfc.ai.core;
 
-import com.sfc.ai.core.advisor.ToolCallNotificationAdvisor;
+import com.sfc.ai.constant.LlmMessageType;
 import com.sfc.ai.core.adapter.LlmChatAdapter;
 import com.sfc.ai.core.adapter.LlmChatAdapterRegistry;
-import com.sfc.ai.constant.LlmMessageType;
+import com.sfc.ai.core.advisor.ToolCallNotificationAdvisor;
 import com.sfc.ai.core.channel.MessageChannel;
+import com.sfc.ai.core.memory.ChatMemoryRepairer;
+import com.sfc.ai.core.memory.JpaChatMemoryRepository;
+import com.sfc.ai.core.tool.RegisteredTool;
+import com.sfc.ai.core.tool.ToolCallIdProvider;
+import com.sfc.ai.core.tool.ToolProvider;
 import com.sfc.ai.model.chat.message.LlmResponse;
 import com.sfc.ai.model.chat.message.UserRequest;
 import com.sfc.ai.model.chat.payload.*;
-import com.sfc.ai.model.chat.session.ChatSession;
 import com.sfc.ai.model.po.AiConversation;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.model.po.LlmProvider;
 import com.sfc.ai.service.AiConversationService;
 import com.sfc.ai.service.LlmModelService;
 import com.sfc.ai.service.LlmProviderService;
-import com.xiaotao.saltedfishcloud.utils.MapperHolder;
-import com.sfc.ai.core.memory.ChatMemoryRepairer;
-import com.sfc.ai.core.memory.JpaChatMemoryRepository;
-import com.sfc.ai.core.tool.ChannelMediatedToolCallback;
-import com.sfc.ai.core.tool.RegisteredTool;
-import com.sfc.ai.core.tool.SfcAgentToolCallbackDecorator;
-import com.sfc.ai.core.tool.ToolExecution;
-import com.sfc.ai.core.tool.ToolCallIdProvider;
-import com.sfc.ai.model.chat.payload.RegisterToolPayload;
-import com.sfc.ai.model.chat.payload.ToolCallAckPayload;
-import com.sfc.ai.tool.CommonTools;
-import com.sfc.ai.tool.NetDiskTools;
-import com.sfc.ai.tool.TextSearchTools;
 import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
+import com.xiaotao.saltedfishcloud.utils.MapperHolder;
 import com.xiaotao.saltedfishcloud.utils.StringUtils;
-import org.springframework.ai.support.ToolCallbacks;
-import org.springframework.ai.tool.ToolCallback;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
@@ -39,25 +29,19 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
-import reactor.core.Disposable;
+import org.springframework.ai.tool.ToolCallback;
 import reactor.core.publisher.Flux;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * AI Agent 执行器默认实现。
  * <p>
  * 负责 LLM 调用、流式响应处理、工具调用追踪等 Agent 核心逻辑。
- * 持有 {@link MessageChannel} 引用用于消息收发，内部管理 {@link ChatSession} 会话状态。
+ * 持有 {@link MessageChannel} 引用用于消息收发，内部管理 {@link com.sfc.ai.model.chat.session.ChatSession} 会话状态。
+ * 工具执行管理与会话状态分别委托给 {@link ToolExecutionManager} 和 {@link SessionContext}。
  * <p>
  * 在构造函数中通过 {@link MessageChannel#onMessage(MessageChannel.MessageHandler)}
  * 注册自身为入站消息处理器。
@@ -71,30 +55,13 @@ public class AgentExecutor {
     private final LlmProviderService llmProviderService;
     private final LlmChatAdapterRegistry adapterRegistry;
     private final AiConversationService aiConversationService;
-    private final CommonTools commonTools;
-    private final NetDiskTools netDiskTools;
-    private final TextSearchTools textSearchTools;
+    private final ToolProvider toolProvider;
     private final JpaChatMemoryRepository chatMemoryRepository;
 
-    private final Map<String, ChannelMediatedToolCallback> registeredTools = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, CompletableFuture<String>> pendingToolCalls = new ConcurrentHashMap<>();
+    private final ToolExecutionManager toolExecutionManager = new ToolExecutionManager();
+    private final SessionContext sessionContext = new SessionContext();
 
-    /** 进行中的工具调用注册表，key 为工具调用 ID，value 为执行记录（含 Future、调用 ID、工具名）。
-     * 装饰器与 {@link #handleStop()} 通过原子 {@code remove} 仲裁 {@link LlmMessageType#TOOL_CALL_END} 的发送归属 */
-    private final ConcurrentHashMap<String, ToolExecution> runningToolCalls = new ConcurrentHashMap<>();
-
-    /** 内建工具执行的虚拟线程池（per-session），使工具调用可被 {@link Thread#interrupt()} 硬中断 */
-    private final ExecutorService toolExecutor = Executors.newVirtualThreadPerTaskExecutor();
-
-    /** 会话级 STOP 标志，true 时抑制 Flux 管线的 {@code doOnError} 错误通知 */
-    private final AtomicBoolean stopped = new AtomicBoolean(false);
-
-    /** DONE 消息去重标志，保证 {@link LlmMessageType#DONE} 在正常完成与 STOP 间只发送一次 */
-    private final AtomicBoolean doneSent = new AtomicBoolean(false);
-
-    private ChatSession chatSession;
-    private Disposable chatDisposable;
-    private CompletableFuture<?> titleFuture;
+    private final Map<String, ToolCallback> registeredTools = new ConcurrentHashMap<>();
 
     public AgentExecutor(MessageChannel channel,
                           LlmModelService llmModelService,
@@ -102,9 +69,7 @@ public class AgentExecutor {
                           LlmProviderService llmProviderService,
                           LlmChatAdapterRegistry adapterRegistry,
                           AiConversationService aiConversationService,
-                          CommonTools commonTools,
-                          NetDiskTools netDiskTools,
-                          TextSearchTools textSearchTools,
+                          ToolProvider toolProvider,
                           JpaChatMemoryRepository chatMemoryRepository) {
         this.channel = channel;
         this.llmModelService = llmModelService;
@@ -112,9 +77,7 @@ public class AgentExecutor {
         this.llmProviderService = llmProviderService;
         this.adapterRegistry = adapterRegistry;
         this.aiConversationService = aiConversationService;
-        this.commonTools = commonTools;
-        this.netDiskTools = netDiskTools;
-        this.textSearchTools = textSearchTools;
+        this.toolProvider = toolProvider;
         this.chatMemoryRepository = chatMemoryRepository;
         channel.onMessage(this::dispatch);
         channel.onClose(this::onChannelClosed);
@@ -125,32 +88,11 @@ public class AgentExecutor {
      */
     private void onChannelClosed() {
         log.debug("消息通道已关闭，取消所有进行中的 AI 操作");
-
-        runningToolCalls.forEach((toolCallId, exec) -> {
-            if (exec.future().cancel(true)) {
-                runningToolCalls.remove(toolCallId);
-                ToolCallEndPayload payload = new ToolCallEndPayload();
-                payload.setId(exec.toolCallId());
-                payload.setName(exec.toolName());
-                payload.setStatus(ToolCallStatus.CANCELLED);
-                payload.setErrorMessage("连接已关闭，中断了工具调用");
-                channel.send(LlmMessageType.TOOL_CALL_END, payload);
-            }
-        });
-        runningToolCalls.clear();
-
-        pendingToolCalls.values().forEach(f -> f.cancel(true));
-        pendingToolCalls.clear();
-
-        if (chatDisposable != null && !chatDisposable.isDisposed()) {
-            chatDisposable.dispose();
-        }
-        if (titleFuture != null && !titleFuture.isDone()) {
-            titleFuture.cancel(true);
-        }
-        toolExecutor.shutdownNow();
+        toolExecutionManager.cancelAll("连接已关闭，中断了工具调用", channel);
+        toolExecutionManager.shutdown();
+        sessionContext.dispose();
         compensateDanglingToolCalls();
-        chatSession = null;
+        sessionContext.clearSession();
     }
 
     private void dispatch(UserRequest request) {
@@ -182,12 +124,12 @@ public class AgentExecutor {
         }
 
         boolean isNew = !aiConversationService.existsByConversationId(sessionId);
-        chatSession = new ChatSession(sessionId, channel.getUser(), isNew);
+        sessionContext.startSession(sessionId, channel.getUser(), isNew);
         channel.send(LlmMessageType.SESSION_ACK, new SessionAckPayload(sessionId));
     }
 
     private void handleChat(UserRequest request) throws Exception {
-        if (chatSession == null) {
+        if (!sessionContext.hasSession()) {
             channel.sendError("请先发送 START_SESSION 消息开启会话");
             return;
         }
@@ -205,7 +147,7 @@ public class AgentExecutor {
         }
 
         Long uid = model.getUid();
-        if (uid != null && uid != 0 && (chatSession.getUser() == null || !uid.equals(chatSession.getUser().getId()))) {
+        if (uid != null && uid != 0 && (sessionContext.getUser() == null || !uid.equals(sessionContext.getUser().getId()))) {
             channel.sendError("无权访问该模型");
             return;
         }
@@ -216,8 +158,8 @@ public class AgentExecutor {
             return;
         }
 
-        boolean isFirstChat = chatSession.isFirstChat();
-        chatSession.markFirstChatDone();
+        boolean isFirstChat = sessionContext.isFirstChat();
+        sessionContext.markFirstChatDone();
         if (isFirstChat) {
             generateTitleAsync(chatData, provider, model);
         }
@@ -225,30 +167,27 @@ public class AgentExecutor {
         LlmChatAdapter adapter = adapterRegistry.getAdapter(provider.getAdapter());
         long startTime = System.currentTimeMillis();
 
-        stopped.set(false);
-        doneSent.set(false);
+        sessionContext.startChat();
 
-        UserPrincipal currentUser = chatSession.getUser();
+        UserPrincipal currentUser = sessionContext.getUser();
         ToolCallIdProvider idProvider = new ToolCallIdProvider();
         List<ToolCallback> allTools = new ArrayList<>();
-        for (ChannelMediatedToolCallback callback : registeredTools.values()) {
-            allTools.add(new SfcAgentToolCallbackDecorator(callback, channel, currentUser,
-                    toolExecutor, runningToolCalls, idProvider));
+        for (ToolCallback callback : registeredTools.values()) {
+            allTools.add(toolExecutionManager.decorate(callback, channel, currentUser, idProvider));
         }
-        for (ToolCallback callback : ToolCallbacks.from(commonTools, netDiskTools, textSearchTools)) {
-            allTools.add(new SfcAgentToolCallbackDecorator(callback, channel, currentUser,
-                    toolExecutor, runningToolCalls, idProvider));
+        for (ToolCallback callback : toolProvider.allToolCallbacks()) {
+            allTools.add(toolExecutionManager.decorate(callback, channel, currentUser, idProvider));
         }
         ChatClient chatClient = chatClientService.getChatClient(
-                provider, model, chatSession.getSessionId(), adapter,
+                provider, model, sessionContext.getConversationId(), adapter,
                 builder -> {
                     builder.defaultAdvisors(new ToolCallNotificationAdvisor(channel, idProvider));
                     builder.defaultTools(allTools.toArray());
                 });
 
-        this.chatDisposable = chatClient.prompt(Prompt.builder()
+        sessionContext.setDisposable(chatClient.prompt(Prompt.builder()
                         .messages(SystemMessage.builder()
-                                .text("你的咸鱼云网盘 AI 助手，可以帮助用户整理网盘、查找文件。当前用户用户名为: " + chatSession.getUser().getUsername())
+                                .text("你的咸鱼云网盘 AI 助手，可以帮助用户整理网盘、查找文件。当前用户用户名为: " + sessionContext.getUser().getUsername())
                                 .build())
                         .build())
                 .user(chatData.getContent())
@@ -272,14 +211,14 @@ public class AgentExecutor {
                     return StringUtils.hasText(data.getContent()) || StringUtils.hasText(data.getReasoningContent());
                 })
                 .doOnError(throwable -> {
-                    if (stopped.get()) {
+                    if (sessionContext.isStopped()) {
                         return;
                     }
                     channel.sendError("LLM 响应流处理过程中出错: " + throwable.getMessage());
                     log.error("ai 消息发送出错", throwable);
                 })
                 .doOnComplete(() -> {
-                    if (doneSent.compareAndSet(false, true)) {
+                    if (sessionContext.trySendDone()) {
                         long elapsed = System.currentTimeMillis() - startTime;
                         DonePayload donePayload = new DonePayload();
                         donePayload.setReason("已完成");
@@ -288,16 +227,16 @@ public class AgentExecutor {
                         channel.send(LlmMessageType.DONE, donePayload);
                     }
                 })
-                .subscribe(response -> channel.send(response.getType(), response.getData()));
+                .subscribe(response -> channel.send(response.getType(), response.getData())));
     }
 
     private void handleRegisterTool(UserRequest request) {
         RegisterToolPayload payload = MapperHolder.mapper.convertValue(
                 request.getData(), RegisterToolPayload.class);
         registeredTools.put(payload.getName(),
-                new ChannelMediatedToolCallback(
+                toolExecutionManager.createChannelMediatedTool(
                         new RegisteredTool(payload.getName(), payload.getDescription(), payload.getParameters()),
-                        channel, pendingToolCalls));
+                        channel));
         log.debug("通过 MessageChannel 注册工具: {}", payload.getName());
         channel.send(LlmMessageType.REGISTER_TOOL_ACK, payload.getName());
     }
@@ -305,10 +244,7 @@ public class AgentExecutor {
     private void handleToolAck(UserRequest request) {
         ToolCallAckPayload ack = MapperHolder.mapper.convertValue(
                 request.getData(), ToolCallAckPayload.class);
-        CompletableFuture<String> future = pendingToolCalls.remove(ack.getId());
-        if (future != null) {
-            future.complete(ack.getResult());
-        } else {
+        if (!toolExecutionManager.acknowledge(ack.getId(), ack.getResult())) {
             log.warn("收到未知工具调用 ID 的 TOOL_ACK: {}", ack.getId());
         }
     }
@@ -318,42 +254,20 @@ public class AgentExecutor {
      * <p>
      * 依次：
      * <ol>
-     *   <li>对每个进行中的内建工具尝试 {@link Future#cancel(boolean)}，
-     *       若成功取消（工具仍在运行）则发送 {@link LlmMessageType#TOOL_CALL_END}(CANCELLED)</li>
-     *   <li>取消所有客户端中介工具调用</li>
-     *   <li>取消 LLM 响应流与异步标题生成</li>
-     *   <li>补偿修复对话记忆中悬空的工具调用记录</li>
-     *   <li>通过 {@link #doneSent} CAS 去重发送一次 {@link LlmMessageType#DONE} "已停止"</li>
+     *   <li>通过 {@link SessionContext#stop()} 标记停止状态</li>
+     *   <li>通过 {@link ToolExecutionManager#cancelAll(String, MessageChannel)} 取消所有进行中的工具调用</li>
+     *   <li>通过 {@link SessionContext#dispose()} 释放响应流与异步任务</li>
+     *   <li>通过 {@link #compensateDanglingToolCalls()} 修复对话记忆中悬空的工具调用记录</li>
+     *   <li>通过 {@link SessionContext#trySendDone()} 去重发送一次 {@link LlmMessageType#DONE} "已停止"</li>
      * </ol>
      */
     private void handleStop() {
-        stopped.set(true);
-
-        runningToolCalls.forEach((toolCallId, exec) -> {
-            if (exec.future().cancel(true)) {
-                runningToolCalls.remove(toolCallId);
-                ToolCallEndPayload payload = new ToolCallEndPayload();
-                payload.setId(exec.toolCallId());
-                payload.setName(exec.toolName());
-                payload.setStatus(ToolCallStatus.CANCELLED);
-                payload.setErrorMessage("用户中断了工具调用");
-                channel.send(LlmMessageType.TOOL_CALL_END, payload);
-            }
-        });
-        runningToolCalls.clear();
-
-        pendingToolCalls.values().forEach(f -> f.cancel(true));
-        pendingToolCalls.clear();
-
-        if (chatDisposable != null && !chatDisposable.isDisposed()) {
-            chatDisposable.dispose();
-        }
-        if (titleFuture != null && !titleFuture.isDone()) {
-            titleFuture.cancel(true);
-        }
+        sessionContext.stop();
+        toolExecutionManager.cancelAll("用户中断了工具调用", channel);
+        sessionContext.dispose();
         compensateDanglingToolCalls();
 
-        if (doneSent.compareAndSet(false, true)) {
+        if (sessionContext.trySendDone()) {
             DonePayload donePayload = new DonePayload();
             donePayload.setReason("已停止");
             channel.send(LlmMessageType.DONE, donePayload);
@@ -372,10 +286,10 @@ public class AgentExecutor {
      */
     private void compensateDanglingToolCalls() {
         try {
-            if (chatSession == null) {
+            if (!sessionContext.hasSession()) {
                 return;
             }
-            String conversationId = chatSession.getSessionId();
+            String conversationId = sessionContext.getConversationId();
             List<Message> messages = chatMemoryRepository.findByConversationId(conversationId);
             Optional<ToolResponseMessage> compensation = ChatMemoryRepairer.buildTailCompensation(messages);
             if (compensation.isPresent()) {
@@ -389,7 +303,7 @@ public class AgentExecutor {
     }
 
     private void generateTitleAsync(ChatPayload chatData, LlmProvider provider, LlmModel model) {
-        this.titleFuture = CompletableFuture.runAsync(() -> {
+        sessionContext.setTitleFuture(CompletableFuture.runAsync(() -> {
             try {
                 LlmChatAdapter adapter = adapterRegistry.getAdapter(provider.getAdapter());
                 ChatModel chatModel = adapter.createChatModel(provider, model);
@@ -405,18 +319,18 @@ public class AgentExecutor {
                 }
 
                 AiConversation conversation = new AiConversation();
-                conversation.setConversationId(chatSession.getSessionId());
+                conversation.setConversationId(sessionContext.getConversationId());
                 conversation.setTitle(title);
-                conversation.setUid(chatSession.getUser().getId());
+                conversation.setUid(sessionContext.getUser().getId());
                 aiConversationService.save(conversation);
 
                 TitleUpdatePayload titlePayload = new TitleUpdatePayload();
                 titlePayload.setTitle(title);
-                titlePayload.setConversationId(chatSession.getSessionId());
+                titlePayload.setConversationId(sessionContext.getConversationId());
                 channel.send(LlmMessageType.TITLE_UPDATE, titlePayload);
             } catch (Exception e) {
                 log.error("生成对话标题失败", e);
             }
-        });
+        }));
     }
 }
