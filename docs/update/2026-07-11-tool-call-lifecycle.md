@@ -104,10 +104,18 @@ CHAT → TOOL_CALL_START（id + name + arguments）→ 工具执行 → TOOL_CAL
 ### 工具调用执行流程
 
 ```
-LLM 响应 → 检测 tool call → SimpleToolCallAdvise.after() → 发送 TOOL_CALL_START, 记录 pending id
-         → ToolCallingAdvisor 执行工具
-         → SimpleToolCallAdvise.before() → 匹配 ToolResponseMessage id → 发送 TOOL_CALL_END, 移除 pending id
+LLM 响应 → ToolCallingAdvisor 检测 tool calls
+         → SfcToolCallingManager.executeToolCalls():
+             1) 一次性发送所有 TOOL_CALL_START（使用 LLM toolCall.id() 作为客户端关联 ID）
+             2) 逐个执行工具，委托 ToolExecutionManager.executeToolCall():
+                - 提交到虚拟线程执行器（可硬中断）
+                - 注册到 runningToolCalls（用于 STOP 仲裁）
+                - 执行完成后立即发送 TOOL_CALL_END(SUCCESS / ERROR)
+             3) 汇总工具结果，构建 ToolResponseMessage 回传 LLM
 ```
+
+> 注：`TOOL_CALL_START` 的 `id` 直接使用 LLM 返回的 `toolCall.id()`（如 `call_abc123`），
+> `TOOL_CALL_END` 使用相同 ID。
 
 ---
 

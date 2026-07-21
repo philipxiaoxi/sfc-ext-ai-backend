@@ -6,7 +6,6 @@ import com.sfc.ai.core.advisor.MessageConvertAdvisor;
 import com.sfc.ai.core.advisor.SfcChatMemoryAdvisor;
 import com.sfc.ai.core.memory.JpaChatMemoryRepository;
 import com.sfc.ai.core.memory.SfcChatMemory;
-import com.sfc.ai.core.tool.FallbackToolCallbackResolver;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.model.po.LlmProvider;
 import com.sfc.ai.tool.CommonTools;
@@ -44,24 +43,24 @@ public class ChatClientService {
      * 获取一个配置好的 ChatClient 实例，允许外部通过 {@link Consumer} 自定义 Builder
      * （如注册工具、添加 Advisors 等）。
      *
-     * @param llmProvider      LLM 提供商配置（含 API Key、地址、适配器标识等）
-     * @param model            使用的模型配置（含模型 ID）
-     * @param conversationId   会话 ID，用于在 ChatMemory 中区分不同的对话
-     * @param adapter          聊天适配器，用于消息转换和记忆
-     * @param builderConsumer  Builder 自定义回调，可为 null；在此回调中可调用
-     *                         {@link ChatClient.Builder#defaultTools(Object...)} 等注册工具
+     * @param llmProvider         LLM 提供商配置（含 API Key、地址、适配器标识等）
+     * @param model               使用的模型配置（含模型 ID）
+     * @param conversationId      会话 ID，用于在 ChatMemory 中区分不同的对话
+     * @param adapter             聊天适配器，用于消息转换和记忆
+     * @param toolCallingManager  工具调用管理器，用于 {@link ToolCallingAdvisor} 的工具执行循环；
+     *                            由调用方提供以注入生命周期通知逻辑（如 {@code SfcToolCallingManager}）
+     * @param builderConsumer     Builder 自定义回调，可为 null；在此回调中可调用
+     *                            {@link ChatClient.Builder#defaultTools(Object...)} 等注册工具
      * @return 配置完成的 ChatClient 实例
      */
     public ChatClient getChatClient(LlmProvider llmProvider, LlmModel model, String conversationId,
-                                      LlmChatAdapter adapter,
+                                      LlmChatAdapter adapter, ToolCallingManager toolCallingManager,
                                       Consumer<ChatClient.Builder> builderConsumer) {
         ChatModel chatModel = adapterRegistry.getAdapter(llmProvider.getAdapter())
                 .createChatModel(llmProvider, model);
 
         ToolCallingAdvisor toolCallingAdvisor = ToolCallingAdvisor.builder()
-                .toolCallingManager(ToolCallingManager.builder()
-                        .toolCallbackResolver(new FallbackToolCallbackResolver())
-                        .build())
+                .toolCallingManager(toolCallingManager)
                 .conversationHistoryEnabled(false)
                 .build();
 
@@ -84,20 +83,22 @@ public class ChatClientService {
     /**
      * 获取一个配置好的 ChatClient 实例（内部已合并内建工具与额外工具）。
      *
-     * @param llmProvider    LLM 提供商配置（含 API Key、地址、适配器标识等）
-     * @param model          使用的模型配置（含模型 ID）
-     * @param conversationId 会话 ID，用于在 ChatMemory 中区分不同的对话
-     * @param extraTools     额外注入的工具回调（如动态注册的工具），与 commonTools 合并
+     * @param llmProvider        LLM 提供商配置（含 API Key、地址、适配器标识等）
+     * @param model              使用的模型配置（含模型 ID）
+     * @param conversationId     会话 ID，用于在 ChatMemory 中区分不同的对话
+     * @param toolCallingManager 工具调用管理器
+     * @param extraTools         额外注入的工具回调（如动态注册的工具），与 commonTools 合并
      * @return 配置完成的 ChatClient 实例
      */
     public ChatClient getChatClient(LlmProvider llmProvider, LlmModel model, String conversationId,
-                                     LlmChatAdapter adapter, Object... extraTools) {
+                                      LlmChatAdapter adapter, ToolCallingManager toolCallingManager,
+                                      Object... extraTools) {
         // 合并内建工具与额外工具
         List<Object> allTools = new ArrayList<>();
         allTools.add(commonTools);
         Collections.addAll(allTools, extraTools);
 
-        return getChatClient(llmProvider, model, conversationId, adapter,
+        return getChatClient(llmProvider, model, conversationId, adapter, toolCallingManager,
                 builder -> builder.defaultTools(allTools.toArray()));
     }
 

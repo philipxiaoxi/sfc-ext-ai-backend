@@ -3,12 +3,12 @@ package com.sfc.ai.core;
 import com.sfc.ai.constant.LlmMessageType;
 import com.sfc.ai.core.adapter.LlmChatAdapter;
 import com.sfc.ai.core.adapter.LlmChatAdapterRegistry;
-import com.sfc.ai.core.advisor.ToolCallNotificationAdvisor;
 import com.sfc.ai.core.channel.MessageChannel;
 import com.sfc.ai.core.memory.ChatMemoryRepairer;
 import com.sfc.ai.core.memory.JpaChatMemoryRepository;
+import com.sfc.ai.core.tool.FallbackToolCallbackResolver;
 import com.sfc.ai.core.tool.RegisteredTool;
-import com.sfc.ai.core.tool.ToolCallIdProvider;
+import com.sfc.ai.core.tool.SfcToolCallingManager;
 import com.sfc.ai.core.tool.ToolProvider;
 import com.sfc.ai.model.chat.message.LlmResponse;
 import com.sfc.ai.model.chat.message.UserRequest;
@@ -30,6 +30,7 @@ import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.execution.DefaultToolExecutionExceptionProcessor;
 import reactor.core.publisher.Flux;
 
 import java.util.*;
@@ -170,20 +171,17 @@ public class AgentExecutor {
         sessionContext.startChat();
 
         UserPrincipal currentUser = sessionContext.getUser();
-        ToolCallIdProvider idProvider = new ToolCallIdProvider();
         List<ToolCallback> allTools = new ArrayList<>();
-        for (ToolCallback callback : registeredTools.values()) {
-            allTools.add(toolExecutionManager.decorate(callback, channel, currentUser, idProvider));
-        }
-        for (ToolCallback callback : toolProvider.allToolCallbacks()) {
-            allTools.add(toolExecutionManager.decorate(callback, channel, currentUser, idProvider));
-        }
+        allTools.addAll(registeredTools.values());
+        allTools.addAll(toolProvider.allToolCallbacks());
+        SfcToolCallingManager sfcToolCallingManager = new SfcToolCallingManager(
+                new FallbackToolCallbackResolver(),
+                DefaultToolExecutionExceptionProcessor.builder().build(),
+                toolExecutionManager, channel, currentUser);
         ChatClient chatClient = chatClientService.getChatClient(
                 provider, model, sessionContext.getConversationId(), adapter,
-                builder -> {
-                    builder.defaultAdvisors(new ToolCallNotificationAdvisor(channel, idProvider));
-                    builder.defaultTools(allTools.toArray());
-                });
+                sfcToolCallingManager,
+                builder -> builder.defaultTools(allTools.toArray()));
 
         sessionContext.setDisposable(chatClient.prompt(Prompt.builder()
                         .messages(SystemMessage.builder()
