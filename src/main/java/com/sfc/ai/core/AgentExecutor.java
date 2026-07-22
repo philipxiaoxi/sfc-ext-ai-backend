@@ -13,7 +13,6 @@ import com.sfc.ai.core.tool.ToolProvider;
 import com.sfc.ai.model.chat.message.LlmResponse;
 import com.sfc.ai.model.chat.message.UserRequest;
 import com.sfc.ai.model.chat.payload.*;
-import com.sfc.ai.model.po.AiConversation;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.model.po.LlmProvider;
 import com.sfc.ai.service.AiConversationService;
@@ -27,7 +26,6 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
-import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.execution.DefaultToolExecutionExceptionProcessor;
@@ -36,6 +34,7 @@ import reactor.core.publisher.Flux;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * AI Agent 执行器默认实现。
@@ -44,8 +43,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 持有 {@link MessageChannel} 引用用于消息收发，内部管理 {@link com.sfc.ai.model.chat.session.ChatSession} 会话状态。
  * 工具执行管理与会话状态分别委托给 {@link ToolExecutionManager} 和 {@link SessionContext}。
  * <p>
- * 在构造函数中通过 {@link MessageChannel#onMessage(MessageChannel.MessageHandler)}
- * 注册自身为入站消息处理器。
+ * 创建后需调用 {@link #start()} 激活执行器，使用完毕后调用 {@link #close()} ()} 释放资源。
  */
 @Slf4j
 public class AgentExecutor {
@@ -63,6 +61,10 @@ public class AgentExecutor {
     private final SessionContext sessionContext = new SessionContext();
 
     private final Map<String, ToolCallback> registeredTools = new ConcurrentHashMap<>();
+    private final AtomicBoolean stopped = new AtomicBoolean(false);
+
+    private final AgentExecutorConfig config;
+    private final ConversationTitleGenerator titleGenerator;
 
     public AgentExecutor(MessageChannel channel,
                           LlmModelService llmModelService,
@@ -71,7 +73,9 @@ public class AgentExecutor {
                           LlmChatAdapterRegistry adapterRegistry,
                           AiConversationService aiConversationService,
                           ToolProvider toolProvider,
-                          JpaChatMemoryRepository chatMemoryRepository) {
+                          JpaChatMemoryRepository chatMemoryRepository,
+                          AgentExecutorConfig config,
+                          ConversationTitleGenerator titleGenerator) {
         this.channel = channel;
         this.llmModelService = llmModelService;
         this.chatClientService = chatClientService;
@@ -80,20 +84,43 @@ public class AgentExecutor {
         this.aiConversationService = aiConversationService;
         this.toolProvider = toolProvider;
         this.chatMemoryRepository = chatMemoryRepository;
-        channel.onMessage(this::dispatch);
-        channel.onClose(this::onChannelClosed);
+        this.config = config;
+        this.titleGenerator = titleGenerator;
     }
 
     /**
-     * 通道关闭回调，取消所有进行中的操作。
+     * 启动 Agent 执行器，注册消息通道处理器开始处理请求。
      */
-    private void onChannelClosed() {
-        log.debug("消息通道已关闭，取消所有进行中的 AI 操作");
-        toolExecutionManager.cancelAll("连接已关闭，中断了工具调用", channel);
+    public void start() {
+        stopped.set(false);
+        channel.onMessage(this::dispatch);
+        channel.onClose(this::onChannelClosed);
+        log.debug("Agent 执行器已启动");
+    }
+
+    /**
+     * 关闭 Agent 执行器，取消所有进行中的操作并清理资源。
+     * <p>
+     * 幂等方法，多次调用仅首次生效。调用后执行器不再可用。
+     */
+    public void close() {
+        if (!stopped.compareAndSet(false, true)) {
+            return;
+        }
+        log.debug("关闭 Agent 执行器");
+        toolExecutionManager.cancelAll("执行器已关闭，中断了工具调用", channel);
         toolExecutionManager.shutdown();
         sessionContext.dispose();
         compensateDanglingToolCalls();
         sessionContext.clearSession();
+    }
+
+    /**
+     * 通道关闭回调，委托给 {@link #close()}。
+     */
+    private void onChannelClosed() {
+        log.debug("消息通道已关闭，取消所有进行中的 AI 操作");
+        close();
     }
 
     private void dispatch(UserRequest request) {
@@ -301,34 +328,19 @@ public class AgentExecutor {
     }
 
     private void generateTitleAsync(ChatPayload chatData, LlmProvider provider, LlmModel model) {
-        sessionContext.setTitleFuture(CompletableFuture.runAsync(() -> {
-            try {
-                LlmChatAdapter adapter = adapterRegistry.getAdapter(provider.getAdapter());
-                ChatModel chatModel = adapter.createChatModel(provider, model);
-                ChatClient bareClient = ChatClient.builder(chatModel).build();
-
-                String title = bareClient.prompt()
-                        .user("用20个字符以内总结以下消息：" + chatData.getContent())
-                        .call()
-                        .content();
-
-                if (title == null || title.isBlank()) {
-                    title = "新对话";
-                }
-
-                AiConversation conversation = new AiConversation();
-                conversation.setConversationId(sessionContext.getConversationId());
-                conversation.setTitle(title);
-                conversation.setUid(sessionContext.getUser().getId());
-                aiConversationService.save(conversation);
-
-                TitleUpdatePayload titlePayload = new TitleUpdatePayload();
-                titlePayload.setTitle(title);
-                titlePayload.setConversationId(sessionContext.getConversationId());
-                channel.send(LlmMessageType.TITLE_UPDATE, titlePayload);
-            } catch (Exception e) {
-                log.error("生成对话标题失败", e);
-            }
-        }));
+        if (!config.isAutoGenerateTitle()) {
+            return;
+        }
+        CompletableFuture<Void> future = CompletableFuture.runAsync(() ->
+                titleGenerator.generate(
+                        channel,
+                        sessionContext.getConversationId(),
+                        sessionContext.getUser().getId(),
+                        chatData.getContent(),
+                        provider,
+                        model
+                )
+        );
+        sessionContext.setTitleFuture(future);
     }
 }

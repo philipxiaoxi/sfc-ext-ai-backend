@@ -3,6 +3,7 @@ package com.sfc.ai;
 import com.sfc.ai.config.AiWebSocketConfig;
 import com.sfc.ai.controller.*;
 import com.sfc.ai.core.AgentExecutorFactory;
+import com.sfc.ai.core.ConversationTitleGenerator;
 import com.sfc.ai.core.ChatClientService;
 import com.sfc.ai.core.adapter.DeepSeekChatAdapter;
 import com.sfc.ai.core.adapter.LlmChatAdapterRegistry;
@@ -41,7 +42,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
         AiConversationServiceImpl.class,
         CommonTools.class,
         NetDiskTools.class,
-        TextSearchTools.class
+        TextSearchTools.class,
+        ConversationTitleGenerator.class
 })
 @EnableJpaRepositories(basePackageClasses = LlmModelRepo.class)
 @EntityScan(basePackageClasses = LlmModel.class)

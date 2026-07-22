@@ -1,5 +1,7 @@
 package com.sfc.ai.controller;
 
+import com.sfc.ai.core.AgentExecutor;
+import com.sfc.ai.core.AgentExecutorConfig;
 import com.sfc.ai.core.AgentExecutorFactory;
 import com.sfc.ai.core.channel.WebSocketMessageChannel;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +26,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 public class AiChatWebSocketHandler extends TextWebSocketHandler {
 
     private static final String CHANNEL_KEY = "WS_CHANNEL";
+    private static final String EXECUTOR_KEY = "WS_EXECUTOR";
 
     private final AgentExecutorFactory agentExecutorFactory;
 
@@ -35,8 +38,12 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionEstablished(@NonNull WebSocketSession session) throws Exception {
         super.afterConnectionEstablished(session);
         WebSocketMessageChannel channel = new WebSocketMessageChannel(session);
-        agentExecutorFactory.create(channel);
+        AgentExecutorConfig config = new AgentExecutorConfig();
+        config.setAutoGenerateTitle(true);
+        AgentExecutor executor = agentExecutorFactory.create(channel, config);
+        executor.start();
         session.getAttributes().put(CHANNEL_KEY, channel);
+        session.getAttributes().put(EXECUTOR_KEY, executor);
     }
 
     @Override
@@ -56,6 +63,10 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionClosed(@NonNull WebSocketSession session, @NonNull CloseStatus status) {
         log.info("WebSocket 连接已关闭，状态: {}", status);
+        AgentExecutor executor = (AgentExecutor) session.getAttributes().remove(EXECUTOR_KEY);
+        if (executor != null) {
+            executor.close();
+        }
         WebSocketMessageChannel channel =
                 (WebSocketMessageChannel) session.getAttributes().remove(CHANNEL_KEY);
         if (channel != null) {

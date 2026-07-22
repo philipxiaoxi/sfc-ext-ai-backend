@@ -14,7 +14,7 @@ import com.sfc.ai.tool.TextSearchTools;
 /**
  * {@link AgentExecutor} 工厂，将 AgentExecutor 的依赖注入与创建逻辑封装在一起。
  * <p>
- * 业务方只需传入 {@link MessageChannel} 即可创建 AgentExecutor，无需感知其内部依赖。
+ * 业务方只需传入 {@link MessageChannel} 和 {@link AgentExecutorConfig} 即可创建 AgentExecutor，无需感知其内部依赖。
  */
 public class AgentExecutorFactory {
 
@@ -25,6 +25,7 @@ public class AgentExecutorFactory {
     private final AiConversationService aiConversationService;
     private final ToolProvider toolProvider;
     private final JpaChatMemoryRepository chatMemoryRepository;
+    private final ConversationTitleGenerator titleGenerator;
 
     public AgentExecutorFactory(LlmModelService llmModelService,
                                   ChatClientService chatClientService,
@@ -34,7 +35,8 @@ public class AgentExecutorFactory {
                                   CommonTools commonTools,
                                   NetDiskTools netDiskTools,
                                   TextSearchTools textSearchTools,
-                                  JpaChatMemoryRepository chatMemoryRepository) {
+                                  JpaChatMemoryRepository chatMemoryRepository,
+                                  ConversationTitleGenerator titleGenerator) {
         this.llmModelService = llmModelService;
         this.chatClientService = chatClientService;
         this.llmProviderService = llmProviderService;
@@ -42,15 +44,17 @@ public class AgentExecutorFactory {
         this.aiConversationService = aiConversationService;
         this.toolProvider = new ToolProvider(commonTools, netDiskTools, textSearchTools);
         this.chatMemoryRepository = chatMemoryRepository;
+        this.titleGenerator = titleGenerator;
     }
 
     /**
-     * 使用给定的消息通道创建一个新的 AgentExecutor。
+     * 使用给定的消息通道和配置创建一个新的 AgentExecutor。
      *
      * @param channel 消息通道
+     * @param config  Agent 执行器配置
      * @return 新创建的 AgentExecutor 实例
      */
-    public AgentExecutor create(MessageChannel channel) {
+    public AgentExecutor create(MessageChannel channel, AgentExecutorConfig config) {
         return new AgentExecutor(
                 channel,
                 llmModelService,
@@ -59,7 +63,9 @@ public class AgentExecutorFactory {
                 adapterRegistry,
                 aiConversationService,
                 toolProvider,
-                chatMemoryRepository
+                chatMemoryRepository,
+                config,
+                titleGenerator
         );
     }
 }
