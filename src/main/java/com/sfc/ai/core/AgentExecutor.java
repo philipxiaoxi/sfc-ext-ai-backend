@@ -1,91 +1,89 @@
 package com.sfc.ai.core;
 
 import com.sfc.ai.constant.LlmMessageType;
-import com.sfc.ai.core.adapter.LlmChatAdapter;
-import com.sfc.ai.core.adapter.LlmChatAdapterRegistry;
 import com.sfc.ai.core.channel.MessageChannel;
 import com.sfc.ai.core.memory.ChatMemoryRepairer;
-import com.sfc.ai.core.memory.JpaChatMemoryRepository;
-import com.sfc.ai.core.tool.FallbackToolCallbackResolver;
 import com.sfc.ai.core.tool.RegisteredTool;
-import com.sfc.ai.core.tool.SfcToolCallingManager;
-import com.sfc.ai.core.tool.ToolProvider;
-import com.sfc.ai.model.chat.message.LlmResponse;
+import com.sfc.ai.model.chat.payload.ChatPayload;
+import com.sfc.ai.model.chat.payload.DonePayload;
+import com.sfc.ai.model.chat.payload.RegisterToolPayload;
+import com.sfc.ai.model.chat.payload.SessionAckPayload;
+import com.sfc.ai.model.chat.payload.StartSessionPayload;
+import com.sfc.ai.model.chat.payload.ToolCallAckPayload;
 import com.sfc.ai.model.chat.message.UserRequest;
-import com.sfc.ai.model.chat.payload.*;
-import com.sfc.ai.model.po.LlmModel;
-import com.sfc.ai.model.po.LlmProvider;
 import com.sfc.ai.service.AiConversationService;
-import com.sfc.ai.service.LlmModelService;
-import com.sfc.ai.service.LlmProviderService;
-import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
+import com.xiaotao.saltedfishcloud.exception.JsonException;
 import com.xiaotao.saltedfishcloud.utils.MapperHolder;
-import com.xiaotao.saltedfishcloud.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.chat.messages.ToolResponseMessage;
-import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.tool.ToolCallback;
-import org.springframework.ai.tool.execution.DefaultToolExecutionExceptionProcessor;
-import reactor.core.publisher.Flux;
 
-import java.util.*;
-import java.util.concurrent.CompletableFuture;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * AI Agent 执行器默认实现。
  * <p>
- * 负责 LLM 调用、流式响应处理、工具调用追踪等 Agent 核心逻辑。
- * 持有 {@link MessageChannel} 引用用于消息收发，内部管理 {@link com.sfc.ai.model.chat.session.ChatSession} 会话状态。
- * 工具执行管理与会话状态分别委托给 {@link ToolExecutionManager} 和 {@link SessionContext}。
+ * 仅承担消息路由 / 会话生命周期 / 工具调用协作 / 资源释放。LLM 解析、ChatClient
+ * 构造、流式订阅主体逻辑委托给 {@link ChatRunner}；记忆补偿委托给
+ * {@link ChatMemoryRepairer}；首聊标题生成按 {@link AgentExecutorConfig#isAutoGenerateTitle()}
+ * 透传至 {@link ConversationTitleGenerator}。
  * <p>
- * 创建后需调用 {@link #start()} 激活执行器，使用完毕后调用 {@link #close()} ()} 释放资源。
+ * 持有 {@link MessageChannel} 引用用于消息收发，内部管理 {@link SessionContext}
+ * 会话状态与 {@link ToolExecutionManager} 工具执行。
+ * <p>
+ * 创建后需调用 {@link #start()} 激活执行器，使用完毕后调用 {@link #close()} 释放资源。
  */
 @Slf4j
 public class AgentExecutor {
 
+    /** 下行消息通道 */
     private final MessageChannel channel;
-    private final LlmModelService llmModelService;
-    private final ChatClientService chatClientService;
-    private final LlmProviderService llmProviderService;
-    private final LlmChatAdapterRegistry adapterRegistry;
-    private final AiConversationService aiConversationService;
-    private final ToolProvider toolProvider;
-    private final JpaChatMemoryRepository chatMemoryRepository;
 
+    /** CHAT 请求执行器（无状态 Spring 服务） */
+    private final ChatRunner chatRunner;
+
+    /** 记忆补偿修复器（无状态 Spring 服务） */
+    private final ChatMemoryRepairer compensator;
+
+    /** 会话持久化服务，用于 START_SESSION 时判断会话是否已存在 */
+    private final AiConversationService aiConversationService;
+
+    /** Agent 执行器配置 */
+    private final AgentExecutorConfig config;
+
+    /** 工具执行管理器，per-conn 状态 */
     private final ToolExecutionManager toolExecutionManager = new ToolExecutionManager();
+
+    /** 会话上下文，per-conn 状态 */
     private final SessionContext sessionContext = new SessionContext();
 
+    /** 当前连接已注册的客户端中介工具集合（key 工具名 → value 工具回调），per-conn 状态 */
     private final Map<String, ToolCallback> registeredTools = new ConcurrentHashMap<>();
+
+    /** 关闭标志位，CAS 保证幂等关闭 */
     private final AtomicBoolean stopped = new AtomicBoolean(false);
 
-    private final AgentExecutorConfig config;
-    private final ConversationTitleGenerator titleGenerator;
-
+    /**
+     * 构造 Agent 执行器。
+     *
+     * @param channel               下行消息通道
+     * @param chatRunner            CHAT 请求执行器
+     * @param compensator            记忆补偿修复器
+     * @param aiConversationService 会话持久化服务
+     * @param config                Agent 执行器配置
+     */
     public AgentExecutor(MessageChannel channel,
-                          LlmModelService llmModelService,
-                          ChatClientService chatClientService,
-                          LlmProviderService llmProviderService,
-                          LlmChatAdapterRegistry adapterRegistry,
+                          ChatRunner chatRunner,
+                          ChatMemoryRepairer compensator,
                           AiConversationService aiConversationService,
-                          ToolProvider toolProvider,
-                          JpaChatMemoryRepository chatMemoryRepository,
-                          AgentExecutorConfig config,
-                          ConversationTitleGenerator titleGenerator) {
+                          AgentExecutorConfig config) {
         this.channel = channel;
-        this.llmModelService = llmModelService;
-        this.chatClientService = chatClientService;
-        this.llmProviderService = llmProviderService;
-        this.adapterRegistry = adapterRegistry;
+        this.chatRunner = chatRunner;
+        this.compensator = compensator;
         this.aiConversationService = aiConversationService;
-        this.toolProvider = toolProvider;
-        this.chatMemoryRepository = chatMemoryRepository;
         this.config = config;
-        this.titleGenerator = titleGenerator;
     }
 
     /**
@@ -123,6 +121,11 @@ public class AgentExecutor {
         close();
     }
 
+    /**
+     * 根据 {@link UserRequest#getType()} 将请求分发到对应的处理器，捕获所有未处理异常并下发错误信息。
+     *
+     * @param request 来自客户端的用户请求
+     */
     private void dispatch(UserRequest request) {
         try {
             if (request.getType() == null) {
@@ -143,6 +146,13 @@ public class AgentExecutor {
         }
     }
 
+    /**
+     * 处理 START_SESSION 请求：解析会话 ID（缺失则生成 UUID），通过
+     * {@link AiConversationService#existsByConversationId(String)} 判断是否新会话，
+     * 在 {@link SessionContext} 中开启会话并下发 {@link LlmMessageType#SESSION_ACK}。
+     *
+     * @param request 包含 {@link StartSessionPayload} 的用户请求
+     */
     private void handleStartSession(UserRequest request) {
         StartSessionPayload startPayload = MapperHolder.mapper.convertValue(
                 request.getData(), StartSessionPayload.class);
@@ -156,105 +166,39 @@ public class AgentExecutor {
         channel.send(LlmMessageType.SESSION_ACK, new SessionAckPayload(sessionId));
     }
 
-    private void handleChat(UserRequest request) throws Exception {
+    /**
+     * 处理 CHAT 请求：校验会话与 payload，委托 {@link ChatRunner#run} 执行一次 LLM 调用全流程。
+     * <p>
+     * {@link ChatRunner} 在内部抛出的 {@link JsonException}（来自 {@link LlmResolver} 解析失败）
+     * 由本方法捕获并经 {@link MessageChannel#sendError(String)} 下发，不再上抛至
+     * {@link #dispatch} 的 {@code catch (Throwable)}。
+     *
+     * @param request 包含 {@link ChatPayload} 的用户请求
+     */
+    private void handleChat(UserRequest request) {
         if (!sessionContext.hasSession()) {
             channel.sendError("请先发送 START_SESSION 消息开启会话");
             return;
         }
-
         ChatPayload chatData = MapperHolder.mapper.convertValue(request.getData(), ChatPayload.class);
         if (chatData.getModelId() == null || chatData.getContent() == null) {
             channel.sendError("CHAT 消息缺少 modelId 或 content");
             return;
         }
-
-        LlmModel model = llmModelService.findById(chatData.getModelId());
-        if (model == null) {
-            channel.sendError("模型不存在");
-            return;
+        try {
+            chatRunner.run(chatData, channel, sessionContext,
+                    toolExecutionManager, registeredTools, config);
+        } catch (JsonException e) {
+            channel.sendError(e.getMessage());
         }
-
-        Long uid = model.getUid();
-        if (uid != null && uid != 0 && (sessionContext.getUser() == null || !uid.equals(sessionContext.getUser().getId()))) {
-            channel.sendError("无权访问该模型");
-            return;
-        }
-
-        LlmProvider provider = llmProviderService.findById(model.getLlmProviderId());
-        if (provider == null) {
-            channel.sendError("模型提供商不存在");
-            return;
-        }
-
-        boolean isFirstChat = sessionContext.isFirstChat();
-        sessionContext.markFirstChatDone();
-        if (isFirstChat) {
-            generateTitleAsync(chatData, provider, model);
-        }
-
-        LlmChatAdapter adapter = adapterRegistry.getAdapter(provider.getAdapter());
-        long startTime = System.currentTimeMillis();
-
-        sessionContext.startChat();
-
-        UserPrincipal currentUser = sessionContext.getUser();
-        List<ToolCallback> allTools = new ArrayList<>();
-        allTools.addAll(registeredTools.values());
-        allTools.addAll(toolProvider.allToolCallbacks());
-        SfcToolCallingManager sfcToolCallingManager = new SfcToolCallingManager(
-                new FallbackToolCallbackResolver(),
-                DefaultToolExecutionExceptionProcessor.builder().build(),
-                toolExecutionManager, channel, currentUser);
-        ChatClient chatClient = chatClientService.getChatClient(
-                provider, model, sessionContext.getConversationId(), adapter,
-                sfcToolCallingManager,
-                builder -> builder.defaultTools(allTools.toArray()));
-
-        sessionContext.setDisposable(chatClient.prompt(Prompt.builder()
-                        .messages(SystemMessage.builder()
-                                .text("你的咸鱼云网盘 AI 助手，可以帮助用户整理网盘、查找文件。当前用户用户名为: " + sessionContext.getUser().getUsername())
-                                .build())
-                        .build())
-                .user(chatData.getContent())
-                .stream()
-                .chatResponse()
-                .filter(msg -> !msg.getResults().isEmpty())
-                .flatMap(msg -> Flux.fromStream(msg.getResults().stream()))
-                .map(msg -> {
-                    String text = msg.getOutput().getText();
-                    String reasoningContent = adapter.extractReasoningContent(msg.getOutput());
-                    TextPayload textPayload = new TextPayload();
-                    textPayload.setContent(text);
-                    textPayload.setReasoningContent(reasoningContent);
-                    LlmResponse llmResp = new LlmResponse();
-                    llmResp.setType(LlmMessageType.TEXT);
-                    llmResp.setData(textPayload);
-                    return llmResp;
-                })
-                .filter(response -> {
-                    TextPayload data = (TextPayload) response.getData();
-                    return StringUtils.hasText(data.getContent()) || StringUtils.hasText(data.getReasoningContent());
-                })
-                .doOnError(throwable -> {
-                    if (sessionContext.isStopped()) {
-                        return;
-                    }
-                    channel.sendError("LLM 响应流处理过程中出错: " + throwable.getMessage());
-                    log.error("ai 消息发送出错", throwable);
-                })
-                .doOnComplete(() -> {
-                    if (sessionContext.trySendDone()) {
-                        long elapsed = System.currentTimeMillis() - startTime;
-                        DonePayload donePayload = new DonePayload();
-                        donePayload.setReason("已完成");
-                        donePayload.setModelId(model.getModelId());
-                        donePayload.setTime(elapsed);
-                        channel.send(LlmMessageType.DONE, donePayload);
-                    }
-                })
-                .subscribe(response -> channel.send(response.getType(), response.getData())));
     }
 
+    /**
+     * 处理 REGISTER_TOOL 请求：将客户端提供的工具元信息注册为 channel 中介工具回调，
+     * 存入 {@link #registeredTools} 并下发 {@link LlmMessageType#REGISTER_TOOL_ACK}。
+     *
+     * @param request 包含 {@link RegisterToolPayload} 的用户请求
+     */
     private void handleRegisterTool(UserRequest request) {
         RegisterToolPayload payload = MapperHolder.mapper.convertValue(
                 request.getData(), RegisterToolPayload.class);
@@ -266,6 +210,12 @@ public class AgentExecutor {
         channel.send(LlmMessageType.REGISTER_TOOL_ACK, payload.getName());
     }
 
+    /**
+     * 处理 TOOL_ACK 请求：将客户端返回的工具执行结果通过
+     * {@link ToolExecutionManager#acknowledge(String, String)} 完成待 ACK 的客户端中介工具调用。
+     *
+     * @param request 包含 {@link ToolCallAckPayload} 的用户请求
+     */
     private void handleToolAck(UserRequest request) {
         ToolCallAckPayload ack = MapperHolder.mapper.convertValue(
                 request.getData(), ToolCallAckPayload.class);
@@ -300,47 +250,13 @@ public class AgentExecutor {
     }
 
     /**
-     * 补偿修复对话记忆中悬空的工具调用记录。
-     * <p>
-     * 工具调用或 LLM 响应流被 STOP / 连接关闭中断时，记忆中可能残留
-     * 带 toolCalls 但缺少对应 tool 结果消息的 assistant 消息，
-     * 导致后续请求被 LLM API 以 400 拒绝。
-     * 此处为其追加一条内容为 {@link ChatMemoryRepairer#CANCELLED_TOOL_RESULT}
-     * 的占位 tool 结果消息，保证记忆序列完整。
-     * 补偿失败仅记录日志，不影响中断主流程。
+     * 补偿修复对话记忆中悬空的工具调用记录。委托给 {@link ChatMemoryRepairer#compensate(String)}。
+     * 会话不存在时无操作。
      */
     private void compensateDanglingToolCalls() {
-        try {
-            if (!sessionContext.hasSession()) {
-                return;
-            }
-            String conversationId = sessionContext.getConversationId();
-            List<Message> messages = chatMemoryRepository.findByConversationId(conversationId);
-            Optional<ToolResponseMessage> compensation = ChatMemoryRepairer.buildTailCompensation(messages);
-            if (compensation.isPresent()) {
-                chatMemoryRepository.add(conversationId, List.of(compensation.get()));
-                log.debug("会话 {} 已补偿 {} 条被中断的工具调用结果",
-                        conversationId, compensation.get().getResponses().size());
-            }
-        } catch (Exception e) {
-            log.error("补偿修复被中断的工具调用记忆失败", e);
-        }
-    }
-
-    private void generateTitleAsync(ChatPayload chatData, LlmProvider provider, LlmModel model) {
-        if (!config.isAutoGenerateTitle()) {
+        if (!sessionContext.hasSession()) {
             return;
         }
-        CompletableFuture<Void> future = CompletableFuture.runAsync(() ->
-                titleGenerator.generate(
-                        channel,
-                        sessionContext.getConversationId(),
-                        sessionContext.getUser().getId(),
-                        chatData.getContent(),
-                        provider,
-                        model
-                )
-        );
-        sessionContext.setTitleFuture(future);
+        compensator.compensate(sessionContext.getConversationId());
     }
 }

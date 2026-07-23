@@ -3,11 +3,14 @@ package com.sfc.ai;
 import com.sfc.ai.config.AiWebSocketConfig;
 import com.sfc.ai.controller.*;
 import com.sfc.ai.core.AgentExecutorFactory;
-import com.sfc.ai.core.ConversationTitleGenerator;
 import com.sfc.ai.core.ChatClientService;
+import com.sfc.ai.core.ChatRunner;
+import com.sfc.ai.core.ConversationTitleGenerator;
+import com.sfc.ai.core.LlmResolver;
 import com.sfc.ai.core.adapter.DeepSeekChatAdapter;
 import com.sfc.ai.core.adapter.LlmChatAdapterRegistry;
 import com.sfc.ai.core.adapter.OpenAiChatAdapter;
+import com.sfc.ai.core.memory.ChatMemoryRepairer;
 import com.sfc.ai.core.memory.JpaChatMemoryRepository;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.repo.LlmModelRepo;
@@ -15,6 +18,7 @@ import com.sfc.ai.service.impl.AiChatMemoryServiceImpl;
 import com.sfc.ai.service.impl.AiConversationServiceImpl;
 import com.sfc.ai.service.impl.LlmModelServiceImpl;
 import com.sfc.ai.service.impl.LlmProviderServiceImpl;
+import com.sfc.ai.core.tool.ToolProvider;
 import com.sfc.ai.tool.CommonTools;
 import com.sfc.ai.tool.NetDiskTools;
 import com.sfc.ai.tool.TextSearchTools;
@@ -43,7 +47,11 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
         CommonTools.class,
         NetDiskTools.class,
         TextSearchTools.class,
-        ConversationTitleGenerator.class
+        ConversationTitleGenerator.class,
+        ChatRunner.class,
+        LlmResolver.class,
+        ChatMemoryRepairer.class,
+        ToolProvider.class
 })
 @EnableJpaRepositories(basePackageClasses = LlmModelRepo.class)
 @EntityScan(basePackageClasses = LlmModel.class)

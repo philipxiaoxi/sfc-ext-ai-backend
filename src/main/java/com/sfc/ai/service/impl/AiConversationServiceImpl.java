@@ -16,7 +16,6 @@ import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,7 +25,6 @@ import java.util.Map;
 /**
  * AI 对话记录服务实现。
  */
-@Service
 public class AiConversationServiceImpl extends CrudServiceImpl<AiConversation, AiConversationRepo> implements AiConversationService {
 
     @Autowired

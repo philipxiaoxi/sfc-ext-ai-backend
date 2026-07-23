@@ -14,7 +14,7 @@ import java.util.List;
  * <p>
  * 将 {@link CommonTools}、{@link NetDiskTools}、{@link TextSearchTools}
  * 三个 Spring Bean 聚合为统一的 {@link ToolCallback} 列表，
- * 避免 {@code AgentExecutor} 直接持有三个独立的工具字段。
+ * 供 {@code ChatRunner} 注入使用。
  */
 public class ToolProvider {
 

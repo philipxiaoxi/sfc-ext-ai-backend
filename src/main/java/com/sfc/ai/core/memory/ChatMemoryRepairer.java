@@ -1,5 +1,7 @@
 package com.sfc.ai.core.memory;
 
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
@@ -12,28 +14,32 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 聊天记忆修复工具类。
+ * 聊天记忆修复组件。
  * <p>
  * 当 LLM 响应流或工具调用被 STOP / 连接关闭中断时，ChatMemory 中可能残留
- * “带 toolCalls 的 assistant 消息缺少对应 tool 结果消息”的悬空序列。
+ * "带 toolCalls 的 assistant 消息缺少对应 tool 结果消息"的悬空序列。
  * 该序列在后续请求中会触发 LLM API 的 400 校验错误
  * （带 tool_calls 的 assistant 消息之后必须紧跟每个 tool_call_id 对应的 role=tool 消息）。
  * <p>
- * 本类提供两类修复能力：
+ * 本类提供两类能力：
  * <ul>
- *   <li>{@link #repairInMemory(List)}：对完整消息序列做内存级清洗，为所有悬空的
- *       toolCalls 插入合成的“已中断” tool 结果消息，供构建 LLM 请求前使用</li>
- *   <li>{@link #buildTailCompensation(List)}：检查序列中未被 tool 结果覆盖的 toolCalls，
- *       生成需要追加到记忆末尾的补偿 tool 结果消息，供 STOP / 连接关闭中断时补偿落库使用</li>
+ *   <li>实例方法 {@link #compensate(String)}：从持久层读取会话消息并写回补偿消息，
+ *       供 STOP / 连接关闭中断场景使用</li>
+ *   <li>静态方法 {@link #repairInMemory(List)} 与 {@link #buildTailCompensation(List)}：
+ *       纯内存级的修复与补偿构造，便于单元测试与就地调用</li>
  * </ul>
  */
-public final class ChatMemoryRepairer {
+@Slf4j
+@RequiredArgsConstructor
+public class ChatMemoryRepairer {
+
+    /**
+     * 聊天记忆持久化仓库，用于读取会话消息与写回补偿工具结果消息。
+     */
+    private final JpaChatMemoryRepository chatMemoryRepository;
 
     /** 被中断的工具调用的占位结果文本，作为合成 tool 结果消息的内容参与后续 LLM 上下文 */
     public static final String CANCELLED_TOOL_RESULT = "工具调用已被用户中断";
-
-    private ChatMemoryRepairer() {
-    }
 
     /**
      * 对消息序列做内存级完整性修复（不传入额外已覆盖 ID）。
@@ -112,6 +118,35 @@ public final class ChatMemoryRepairer {
             return Optional.empty();
         }
         return Optional.of(buildToolResponseMessage(dangling));
+    }
+
+    /**
+     * 补偿修复指定会话记忆中悬空的工具调用记录。
+     * <p>
+     * 流程：从 {@link JpaChatMemoryRepository} 取出当前对话全部消息，
+     * 调用 {@link #buildTailCompensation(List)} 构造聚合补偿消息，
+     * 若存在悬空则写回。补偿失败仅记日志，不影响中断主流程。
+     * <p>
+     * 行为来源：原 {@code AgentExecutor.compensateDanglingToolCalls} 方法平移到此。
+     *
+     * @param conversationId 会话 ID；为 null 时无操作
+     */
+    public void compensate(String conversationId) {
+        if (conversationId == null) {
+            return;
+        }
+        try {
+            List<Message> messages = chatMemoryRepository.findByConversationId(conversationId);
+            Optional<ToolResponseMessage> compensation = buildTailCompensation(messages);
+            if (compensation.isPresent()) {
+                ToolResponseMessage msg = compensation.get();
+                chatMemoryRepository.add(conversationId, List.of(msg));
+                log.debug("会话 {} 已补偿 {} 条被中断的工具调用结果",
+                        conversationId, msg.getResponses().size());
+            }
+        } catch (Exception e) {
+            log.error("补偿修复会话 {} 被中断的工具调用记忆失败", conversationId, e);
+        }
     }
 
     /**
