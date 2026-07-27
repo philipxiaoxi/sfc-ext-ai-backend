@@ -131,7 +131,6 @@ public class NetDiskTools {
      * @return 操作结果消息
      */
     @Tool(name = "rename", description = "重命名网盘文件或目录")
-    @SensitiveTool("重命名 {disk}:{path}/{name} -> {newName}")
     public String rename(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "文件或目录所在的父目录路径") String path,
@@ -383,7 +382,6 @@ public class NetDiskTools {
      * @return 操作结果消息
      */
     @Tool(name = "write_text_file", description = "全覆盖写入网盘文本文件，文件不存在则自动创建")
-    @SensitiveTool("写入文件 {disk}:{path}/{name}")
     public String writeTextFile(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "文件所在目录路径，以 '/' 开头和作为分隔符") String path,
@@ -421,7 +419,6 @@ public class NetDiskTools {
      * @return 操作结果消息
      */
     @Tool(name = "insert_text_line", description = "在网盘文本文件的指定行号前插入新内容")
-    @SensitiveTool("在文件 {disk}:{path}/{name} 第 {lineNumber} 行插入内容")
     public String insertTextLine(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "文件所在目录路径，以 '/' 开头和作为分隔符") String path,
@@ -495,7 +492,6 @@ public class NetDiskTools {
      * @return 操作结果消息
      */
     @Tool(name = "replace_text_lines", description = "替换网盘文本文件指定行号范围内的内容")
-    @SensitiveTool("替换文件 {disk}:{path}/{name} 第 {startLine}-{endLine} 行的内容")
     public String replaceTextLines(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "文件所在目录路径，以 '/' 开头和作为分隔符") String path,

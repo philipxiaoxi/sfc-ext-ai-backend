@@ -68,6 +68,8 @@ WebSocket 握手时复用已有的 HTTP Session 认证信息（Spring Security�
 | `CHAT` | 发送聊天消息 | `ChatPayload` |
 | `REGISTER_TOOL` | 注册动态工具 | `RegisterToolPayload` |
 | `TOOL_ACK` | 工具调用确认（响应 TOOL_CALL_REQ） | `ToolCallAckPayload` |
+| `APPROVE` | 批准/拒绝敏感工具调用 | `ApprovePayload` |
+| `SWITCH_MODE` | 切换授权模式（FULL / NORMAL） | `SwitchModePayload` |
 | `STOP` | 停止响应 | 无 |
 
 > **STOP 中断行为**：`STOP` 会中断当前进行中的所有 AI 操作，包括：
@@ -97,6 +99,7 @@ WebSocket 握手时复用已有的 HTTP Session 认证信息（Spring Security�
 | `TOOL_CALL_END` | 工具调用结束 | `ToolCallEndPayload` |
 | `TOOL_CALL` | 工具调用（已废弃，由 TOOL_CALL_START + TOOL_CALL_END 替代） | `ToolCallPayload` |
 | `TOOL_CALL_REQ` | 工具调用请求（需要客户端执行并返回结果） | `ToolCallStartPayload` |
+| `PERMISSION_REQUEST` | 请求用户批准敏感工具调用 | `PermissionRequestPayload` |
 | `REGISTER_TOOL_ACK` | 工具注册确认 | `String`（工具名称） |
 | `DONE` | 响应结束 | `DonePayload` |
 | `ERROR` | 错误消息 | `ErrorPayload` |
@@ -262,6 +265,8 @@ WebSocket 握手时复用已有的 HTTP Session 认证信息（Spring Security�
 | `name` | `String` | 是 | 工具名称（在当前会话中唯一） |
 | `description` | `String` | 是 | 工具描述，供 LLM 理解工具用途 |
 | `parameters` | `String` | 是 | JSON Schema 字符串，定义工具参数 |
+| `sensitive` | `boolean` | 否 | 是否为敏感操作，默认 false。设为 true 时需同时提供 `purposeTemplate` |
+| `purposeTemplate` | `String` | 否 | 用途说明模板，支持 `{paramName}` 占位符。例如 `"删除文件 {path}/{name}"` |
 
 ```json
 {
@@ -274,7 +279,100 @@ WebSocket 握手时复用已有的 HTTP Session 认证信息（Spring Security�
 }
 ```
 
+注册敏感工具示例：
+```json
+{
+  "type": "REGISTER_TOOL",
+  "data": {
+    "name": "delete_remote_file",
+    "description": "删除远程服务器上的文件",
+    "parameters": "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"}},\"required\":[\"path\",\"name\"]}",
+    "sensitive": true,
+    "purposeTemplate": "删除远程文件 {path}/{name}"
+  }
+}
+```
+
 对应 Java 类：`com.sfc.ai.model.chat.payload.RegisterToolPayload`
+
+### PermissionRequestPayload
+
+用于 `PERMISSION_REQUEST` 消息，当 AI 调用敏感工具且用户处于普通授权模式时，服务端向客户端请求用户批准。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `toolCallId` | `String` | 工具调用 ID，用于客户端后续发送 `APPROVE` 时关联 |
+| `toolName` | `String` | 工具名称 |
+| `purpose` | `String` | 运行时生成的用途说明（含具体参数值），例如 `"删除文件 private:/doc/report.pdf"` |
+| `arguments` | `Object` | 工具调用参数 |
+
+```json
+{
+  "type": "PERMISSION_REQUEST",
+  "data": {
+    "toolCallId": "call_001",
+    "toolName": "delete",
+    "purpose": "删除文件 private:/doc/report.pdf",
+    "arguments": {
+      "disk": "private",
+      "path": "/doc",
+      "name": "report.pdf"
+    }
+  }
+}
+```
+
+对应 Java 类：`com.sfc.ai.model.chat.payload.PermissionRequestPayload`
+
+### ApprovePayload
+
+用于 `APPROVE` 消息，客户端对 `PERMISSION_REQUEST` 的响应，表示批准或拒绝本次工具调用。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `toolCallId` | `String` | 是 | 工具调用 ID，与对应 `PERMISSION_REQUEST` 的 `toolCallId` 一致 |
+| `approved` | `boolean` | 是 | `true` 批准执行，`false` 拒绝 |
+
+```json
+{
+  "type": "APPROVE",
+  "data": {
+    "toolCallId": "call_001",
+    "approved": true
+  }
+}
+```
+
+```json
+{
+  "type": "APPROVE",
+  "data": {
+    "toolCallId": "call_001",
+    "approved": false
+  }
+}
+```
+
+对应 Java 类：`com.sfc.ai.model.chat.payload.ApprovePayload`
+
+### SwitchModePayload
+
+用于 `SWITCH_MODE` 消息，客户端切换当前 AI 会话的授权模式。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `mode` | `String` | 是 | `"FULL"` 完全授权（敏感工具直接执行），`"NORMAL"` 普通授权（敏感工具需确认） |
+
+```json
+{
+  "type": "SWITCH_MODE",
+  "data": {
+    "mode": "FULL"
+  }
+}
+```
+
+对应 Java 类：`com.sfc.ai.model.chat.payload.SwitchModePayload`
 
 ### ToolCallAckPayload
 
@@ -409,6 +507,51 @@ WebSocket 握手时复用已有的 HTTP Session 认证信息（Spring Security�
     （WebSocket 连接关闭）
 ```
 
+### 敏感工具审批流程
+
+当 LLM 调用被标记为敏感的工具（如删除文件）且当前会话处于普通授权模式时：
+
+```
+客户端                             服务端
+  |                                  |
+  |--- CHAT ------------------------>|  用户发送消息
+  |                                  |  LLM 决定调用敏感工具（如 delete）
+  |<--- TOOL_CALL_START -------------|  LLM 发起工具调用
+  |<--- PERMISSION_REQUEST ----------|  请求用户批准：{toolCallId, toolName, purpose, arguments}
+  |--- APPROVE --------------------->|  用户批准：{toolCallId, approved: true}
+  |                                  |  服务端执行工具
+  |<--- TOOL_CALL_END ---------------|  工具执行结果（status: SUCCESS/ERROR）
+  |<--- TEXT "已删除 xxxx" ----------|  LLM 后续回复
+  |<--- DONE "已完成" ---------------|
+```
+
+用户拒绝时：
+```
+  |<--- PERMISSION_REQUEST ----------|  请求用户批准
+  |--- APPROVE --------------------->|  用户拒绝：{toolCallId, approved: false}
+  |<--- TOOL_CALL_END ---------------|  status: CANCELLED, errorMessage: "用户拒绝了操作"
+  |<--- TEXT "已取消删除操作" -------|  LLM 后续回复
+  |<--- DONE "已完成" ---------------|
+```
+
+完全授权模式下敏感工具直接执行，不会发送 `PERMISSION_REQUEST`：
+
+```
+  |--- SWITCH_MODE ------------------>|  {mode: "FULL"}
+  |<--- TEXT "授权模式已切换为: 完全授权"
+  |--- CHAT ------------------------>|
+  |<--- TOOL_CALL_START -------------|  LLM 调用敏感工具
+  |<--- TOOL_CALL_END ---------------|  直接执行，无需用户批准
+```
+
+切换回普通授权：
+```
+  |--- SWITCH_MODE ------------------>|  {mode: "NORMAL"}
+  |<--- TEXT "授权模式已切换为: 普通授权"
+```
+
+> **注意**：授权模式仅对当前 WebSocket 连接生效，连接断开后重新建立时默认为普通授权模式。
+
 ### 约束规则
 
 1. **START_SESSION**：每条 WebSocket 连接的第一条消息必须为 `START_SESSION` 类型，且整个连接生命周期内仅允许发送一次。
@@ -444,6 +587,7 @@ WebSocket 握手时复用已有的 HTTP Session 认证信息（Spring Security�
 | 模型不存在 | `模型不存在` |
 | 无权访问模型 | `无权访问该模型` |
 | 未知消息类型 | `未知消息类型: xxx` |
+| APPROVE 时找不到对应待批准的工具 | `未找到待批准的工具调用: xxx` |
 
 ---
 
