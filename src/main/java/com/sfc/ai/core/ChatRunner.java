@@ -4,6 +4,8 @@ import com.sfc.ai.constant.LlmMessageType;
 import com.sfc.ai.core.adapter.LlmChatAdapter;
 import com.sfc.ai.core.channel.MessageChannel;
 import com.sfc.ai.core.tool.FallbackToolCallbackResolver;
+import com.sfc.ai.core.tool.PendingApproval;
+import com.sfc.ai.core.tool.SensitiveToolRegistry;
 import com.sfc.ai.core.tool.SfcToolCallingManager;
 import com.sfc.ai.core.tool.ToolProvider;
 import com.sfc.ai.model.chat.message.LlmResponse;
@@ -45,6 +47,7 @@ public class ChatRunner {
     private final ChatClientService chatClientService;
     private final ToolProvider toolProvider;
     private final ConversationTitleGenerator titleGenerator;
+    private final SensitiveToolRegistry sensitiveToolRegistry;
 
     /**
      * 执行一次 CHAT 请求的全流程。
@@ -57,13 +60,15 @@ public class ChatRunner {
      * @param toolExecutionManager  工具执行管理（用于构造 {@link SfcToolCallingManager}）
      * @param registeredTools       当前连接已注册的客户端中介工具集合（只读）
      * @param config                Agent 执行器配置（包含 {@code autoGenerateTitle} 等开关）
+     * @param pendingOps            待批准的操作列表（由调用方传入，避免重复创建）
      */
     public void run(ChatPayload chatData,
                     MessageChannel channel,
                     SessionContext sessionContext,
                     ToolExecutionManager toolExecutionManager,
                     Map<String, ToolCallback> registeredTools,
-                    AgentExecutorConfig config) {
+                    AgentExecutorConfig config,
+                    List<PendingApproval> pendingOps) {
 
         // 1. 解析模型（校验失败抛 JsonException，由 AgentExecutor 捕获发 error）
         LlmResolver.LlmContext ctx = llmResolver.resolve(
@@ -88,7 +93,9 @@ public class ChatRunner {
         SfcToolCallingManager sfcToolCallingManager = new SfcToolCallingManager(
                 new FallbackToolCallbackResolver(),
                 DefaultToolExecutionExceptionProcessor.builder().build(),
-                toolExecutionManager, channel, currentUser);
+                toolExecutionManager, channel, currentUser,
+                sensitiveToolRegistry, pendingOps,
+                config.isFullAuthMode());
 
         // 5. ChatClient 构造（与原 handleChat 一致）
         ChatClient chatClient = chatClientService.getChatClient(

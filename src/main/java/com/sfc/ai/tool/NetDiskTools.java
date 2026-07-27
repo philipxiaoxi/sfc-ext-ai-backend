@@ -1,5 +1,6 @@
 package com.sfc.ai.tool;
 
+import com.sfc.ai.annotation.SensitiveTool;
 import com.xiaotao.saltedfishcloud.constant.ResourceProtocol;
 import com.xiaotao.saltedfishcloud.model.dto.ResourceRequest;
 import com.xiaotao.saltedfishcloud.model.po.file.FileInfo;
@@ -130,6 +131,7 @@ public class NetDiskTools {
      * @return 操作结果消息
      */
     @Tool(name = "rename", description = "重命名网盘文件或目录")
+    @SensitiveTool("重命名 {disk}:{path}/{name} -> {newName}")
     public String rename(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "文件或目录所在的父目录路径") String path,
@@ -153,6 +155,7 @@ public class NetDiskTools {
      * @return 操作结果消息
      */
     @Tool(name = "delete", description = "删除网盘文件或目录。目录下存在子文件或目录时也能直接删除。对于挂载点则是直接移除挂载点。")
+    @SensitiveTool("删除文件 {disk}:{path}/{name}")
     public String delete(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "文件或目录所在的父目录路径") String path,
@@ -178,6 +181,7 @@ public class NetDiskTools {
      * @return 操作结果消息
      */
     @Tool(name = "move", description = "移动网盘文件或目录，支持公共网盘与私人网盘之间的双向移动")
+    @SensitiveTool("移动文件 {sourceDisk}:{sourcePath}/{name} -> {targetDisk}:{targetPath}")
     public String move(
             @ToolParam(description = "源网盘类型，'public' 或 'private'") String sourceDisk,
             @ToolParam(description = "源文件或目录所在的父目录路径") String sourcePath,
@@ -207,6 +211,7 @@ public class NetDiskTools {
      * @return 操作结果消息
      */
     @Tool(name = "copy", description = "复制网盘文件，支持公共网盘与私人网盘之间的双向复制")
+    @SensitiveTool("复制文件 {sourceDisk}:{sourcePath}/{name} -> {targetDisk}:{targetPath}")
     public String copy(
             @ToolParam(description = "源网盘类型，'public' 或 'private'") String sourceDisk,
             @ToolParam(description = "源目录路径") String sourcePath,
@@ -378,6 +383,7 @@ public class NetDiskTools {
      * @return 操作结果消息
      */
     @Tool(name = "write_text_file", description = "全覆盖写入网盘文本文件，文件不存在则自动创建")
+    @SensitiveTool("写入文件 {disk}:{path}/{name}")
     public String writeTextFile(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "文件所在目录路径，以 '/' 开头和作为分隔符") String path,
@@ -415,6 +421,7 @@ public class NetDiskTools {
      * @return 操作结果消息
      */
     @Tool(name = "insert_text_line", description = "在网盘文本文件的指定行号前插入新内容")
+    @SensitiveTool("在文件 {disk}:{path}/{name} 第 {lineNumber} 行插入内容")
     public String insertTextLine(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "文件所在目录路径，以 '/' 开头和作为分隔符") String path,
@@ -488,6 +495,7 @@ public class NetDiskTools {
      * @return 操作结果消息
      */
     @Tool(name = "replace_text_lines", description = "替换网盘文本文件指定行号范围内的内容")
+    @SensitiveTool("替换文件 {disk}:{path}/{name} 第 {startLine}-{endLine} 行的内容")
     public String replaceTextLines(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "文件所在目录路径，以 '/' 开头和作为分隔符") String path,

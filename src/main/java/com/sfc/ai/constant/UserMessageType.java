@@ -18,5 +18,11 @@ public enum UserMessageType {
     TOOL_ACK,
 
     /** 停止请求 */
-    STOP
+    STOP,
+
+    /** 用户对敏感工具调用的批准/拒绝响应 */
+    APPROVE,
+
+    /** 切换授权模式（FULL / NORMAL） */
+    SWITCH_MODE
 }

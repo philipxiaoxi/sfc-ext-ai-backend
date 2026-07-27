@@ -22,8 +22,13 @@ public class ToolProvider {
 
     public ToolProvider(CommonTools commonTools,
                         NetDiskTools netDiskTools,
-                        TextSearchTools textSearchTools) {
+                        TextSearchTools textSearchTools,
+                        SensitiveToolRegistry sensitiveToolRegistry) {
         this.toolCallbacks = Arrays.asList(ToolCallbacks.from(commonTools, netDiskTools, textSearchTools));
+        // 扫描所有内建工具 Bean，注册 @SensitiveTool 注解
+        sensitiveToolRegistry.scanBean(commonTools);
+        sensitiveToolRegistry.scanBean(netDiskTools);
+        sensitiveToolRegistry.scanBean(textSearchTools);
     }
 
     /**

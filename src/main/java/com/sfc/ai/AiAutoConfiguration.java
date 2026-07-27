@@ -18,6 +18,7 @@ import com.sfc.ai.service.impl.AiChatMemoryServiceImpl;
 import com.sfc.ai.service.impl.AiConversationServiceImpl;
 import com.sfc.ai.service.impl.LlmModelServiceImpl;
 import com.sfc.ai.service.impl.LlmProviderServiceImpl;
+import com.sfc.ai.core.tool.SensitiveToolRegistry;
 import com.sfc.ai.core.tool.ToolProvider;
 import com.sfc.ai.tool.CommonTools;
 import com.sfc.ai.tool.NetDiskTools;
@@ -51,7 +52,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
         ChatRunner.class,
         LlmResolver.class,
         ChatMemoryRepairer.class,
-        ToolProvider.class
+        ToolProvider.class,
+        SensitiveToolRegistry.class
 })
 @EnableJpaRepositories(basePackageClasses = LlmModelRepo.class)
 @EntityScan(basePackageClasses = LlmModel.class)

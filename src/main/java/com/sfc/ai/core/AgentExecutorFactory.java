@@ -2,6 +2,7 @@ package com.sfc.ai.core;
 
 import com.sfc.ai.core.channel.MessageChannel;
 import com.sfc.ai.core.memory.ChatMemoryRepairer;
+import com.sfc.ai.core.tool.SensitiveToolRegistry;
 import com.sfc.ai.service.AiConversationService;
 import lombok.RequiredArgsConstructor;
 
@@ -12,7 +13,7 @@ import lombok.RequiredArgsConstructor;
  * {@link AgentExecutor}，无需感知其内部依赖。
  * <p>
  * 工厂自身为 Spring 单例，持有 {@link ChatRunner}、{@link ChatMemoryRepairer}、
- * {@link AiConversationService} 三个无状态协作 Bean。
+ * {@link AiConversationService}、{@link SensitiveToolRegistry} 四个无状态协作 Bean。
  */
 @RequiredArgsConstructor
 public class AgentExecutorFactory {
@@ -20,6 +21,7 @@ public class AgentExecutorFactory {
     private final ChatRunner chatRunner;
     private final ChatMemoryRepairer compensator;
     private final AiConversationService aiConversationService;
+    private final SensitiveToolRegistry sensitiveToolRegistry;
 
     /**
      * 使用给定的消息通道和配置创建一个新的 {@link AgentExecutor}。
@@ -29,6 +31,6 @@ public class AgentExecutorFactory {
      * @return 新创建的 {@link AgentExecutor} 实例
      */
     public AgentExecutor create(MessageChannel channel, AgentExecutorConfig config) {
-        return new AgentExecutor(channel, chatRunner, compensator, aiConversationService, config);
+        return new AgentExecutor(channel, chatRunner, compensator, aiConversationService, config, sensitiveToolRegistry);
     }
 }

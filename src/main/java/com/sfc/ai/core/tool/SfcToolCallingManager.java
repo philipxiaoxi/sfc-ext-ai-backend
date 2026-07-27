@@ -76,6 +76,12 @@ public class SfcToolCallingManager implements ToolCallingManager {
 
     private final UserPrincipal user;
 
+    private final SensitiveToolRegistry sensitiveToolRegistry;
+
+    private final List<PendingApproval> pendingOps;
+
+    private final boolean fullAuthMode;
+
     /**
      * 构造工具调用管理器。
      *
@@ -85,17 +91,26 @@ public class SfcToolCallingManager implements ToolCallingManager {
      * @param executionManager               工具执行管理器，负责实际执行单次工具调用并发送 END
      * @param channel                        消息通道，用于发送 TOOL_CALL_START
      * @param user                           当前用户，用于绑定 Spring Security 上下文；可为 null
+     * @param sensitiveToolRegistry          敏感工具注册表
+     * @param pendingOps                     待批准的操作列表
+     * @param fullAuthMode                   是否完全授权模式，开启后敏感工具直接执行无需用户批准
      */
     public SfcToolCallingManager(ToolCallbackResolver toolCallbackResolver,
                                  ToolExecutionExceptionProcessor toolExecutionExceptionProcessor,
                                  ToolExecutionManager executionManager,
                                  MessageChannel channel,
-                                 @Nullable UserPrincipal user) {
+                                 @Nullable UserPrincipal user,
+                                 SensitiveToolRegistry sensitiveToolRegistry,
+                                 List<PendingApproval> pendingOps,
+                                 boolean fullAuthMode) {
         this.toolCallbackResolver = toolCallbackResolver;
         this.toolExecutionExceptionProcessor = toolExecutionExceptionProcessor;
         this.executionManager = executionManager;
         this.channel = channel;
         this.user = user;
+        this.sensitiveToolRegistry = sensitiveToolRegistry;
+        this.pendingOps = pendingOps;
+        this.fullAuthMode = fullAuthMode;
     }
 
     @Override
@@ -123,7 +138,7 @@ public class SfcToolCallingManager implements ToolCallingManager {
         // 一次性发送所有 TOOL_CALL_START 通知，使用 LLM 返回的 toolCall.id() 作为客户端关联 ID
         notifyToolCallStarts(toolCalls);
 
-        ToolContext toolContext = buildToolContext(prompt);
+        ToolContext toolContext = buildToolContext(prompt, fullAuthMode);
         List<ToolCallback> toolCallbacks = resolveToolCallbacks(prompt);
 
         List<ToolResponseMessage.ToolResponse> toolResponses = new ArrayList<>();
@@ -207,12 +222,13 @@ public class SfcToolCallingManager implements ToolCallingManager {
      * @param prompt 当前请求的 Prompt
      * @return 工具上下文
      */
-    private static ToolContext buildToolContext(Prompt prompt) {
-        Map<String, Object> toolContextMap = Map.of();
+    private static ToolContext buildToolContext(Prompt prompt, boolean fullAuthMode) {
+        Map<String, Object> toolContextMap = new HashMap<>();
         if (prompt.getOptions() instanceof ToolCallingChatOptions toolCallingChatOptions
                 && !CollectionUtils.isEmpty(toolCallingChatOptions.getToolContext())) {
             toolContextMap = new HashMap<>(toolCallingChatOptions.getToolContext());
         }
+        toolContextMap.put("fullAuthMode", fullAuthMode);
         return new ToolContext(toolContextMap);
     }
 
@@ -248,7 +264,8 @@ public class SfcToolCallingManager implements ToolCallingManager {
                                           String finalToolInputArguments, ToolContext toolContext) {
         try {
             return executionManager.executeToolCall(toolCallback, toolCallId, toolName,
-                    finalToolInputArguments, toolContext, user, channel);
+                    finalToolInputArguments, toolContext, user, channel,
+                    sensitiveToolRegistry, pendingOps);
         } catch (ToolExecutionException ex) {
             return toolExecutionExceptionProcessor.process(ex);
         }

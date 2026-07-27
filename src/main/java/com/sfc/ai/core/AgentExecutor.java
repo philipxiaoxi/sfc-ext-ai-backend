@@ -3,20 +3,30 @@ package com.sfc.ai.core;
 import com.sfc.ai.constant.LlmMessageType;
 import com.sfc.ai.core.channel.MessageChannel;
 import com.sfc.ai.core.memory.ChatMemoryRepairer;
+import com.sfc.ai.core.tool.PendingApproval;
 import com.sfc.ai.core.tool.RegisteredTool;
+import com.sfc.ai.core.tool.SensitiveToolRegistry;
+import com.sfc.ai.model.chat.payload.ApprovePayload;
 import com.sfc.ai.model.chat.payload.ChatPayload;
 import com.sfc.ai.model.chat.payload.DonePayload;
 import com.sfc.ai.model.chat.payload.RegisterToolPayload;
 import com.sfc.ai.model.chat.payload.SessionAckPayload;
 import com.sfc.ai.model.chat.payload.StartSessionPayload;
+import com.sfc.ai.model.chat.payload.SwitchModePayload;
+import com.sfc.ai.model.chat.payload.TextPayload;
 import com.sfc.ai.model.chat.payload.ToolCallAckPayload;
+import com.sfc.ai.model.chat.payload.ToolCallEndPayload;
+import com.sfc.ai.model.chat.payload.ToolCallStatus;
 import com.sfc.ai.model.chat.message.UserRequest;
 import com.sfc.ai.service.AiConversationService;
 import com.xiaotao.saltedfishcloud.exception.JsonException;
 import com.xiaotao.saltedfishcloud.utils.MapperHolder;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -62,6 +72,12 @@ public class AgentExecutor {
     /** 当前连接已注册的客户端中介工具集合（key 工具名 → value 工具回调），per-conn 状态 */
     private final Map<String, ToolCallback> registeredTools = new ConcurrentHashMap<>();
 
+    /** 待批准的操作列表 */
+    private final List<PendingApproval> pendingOperations = new ArrayList<>();
+
+    /** 敏感工具注册表 */
+    private final SensitiveToolRegistry sensitiveToolRegistry;
+
     /** 关闭标志位，CAS 保证幂等关闭 */
     private final AtomicBoolean stopped = new AtomicBoolean(false);
 
@@ -78,12 +94,14 @@ public class AgentExecutor {
                           ChatRunner chatRunner,
                           ChatMemoryRepairer compensator,
                           AiConversationService aiConversationService,
-                          AgentExecutorConfig config) {
+                          AgentExecutorConfig config,
+                          SensitiveToolRegistry sensitiveToolRegistry) {
         this.channel = channel;
         this.chatRunner = chatRunner;
         this.compensator = compensator;
         this.aiConversationService = aiConversationService;
         this.config = config;
+        this.sensitiveToolRegistry = sensitiveToolRegistry;
     }
 
     /**
@@ -138,6 +156,8 @@ public class AgentExecutor {
                 case TOOL_ACK -> handleToolAck(request);
                 case STOP -> handleStop();
                 case REGISTER_TOOL -> handleRegisterTool(request);
+                case APPROVE -> handleApprove(request);
+                case SWITCH_MODE -> handleSwitchMode(request);
                 default -> channel.sendError("未知消息类型: " + request.getType());
             }
         } catch (Throwable e) {
@@ -187,7 +207,7 @@ public class AgentExecutor {
         }
         try {
             chatRunner.run(chatData, channel, sessionContext,
-                    toolExecutionManager, registeredTools, config);
+                    toolExecutionManager, registeredTools, config, pendingOperations);
         } catch (JsonException e) {
             channel.sendError(e.getMessage());
         }
@@ -206,6 +226,11 @@ public class AgentExecutor {
                 toolExecutionManager.createChannelMediatedTool(
                         new RegisteredTool(payload.getName(), payload.getDescription(), payload.getParameters()),
                         channel));
+        // 客户端注册敏感工具
+        if (payload.isSensitive() && payload.getPurposeTemplate() != null) {
+            sensitiveToolRegistry.register(payload.getName(), payload.getPurposeTemplate());
+            log.debug("注册客户端敏感工具: {} -> {}", payload.getName(), payload.getPurposeTemplate());
+        }
         log.debug("通过 MessageChannel 注册工具: {}", payload.getName());
         channel.send(LlmMessageType.REGISTER_TOOL_ACK, payload.getName());
     }
@@ -247,6 +272,69 @@ public class AgentExecutor {
             donePayload.setReason("已停止");
             channel.send(LlmMessageType.DONE, donePayload);
         }
+    }
+
+    /**
+     * 处理 SWITCH_MODE 请求：切换当前 AI 会话的授权模式。
+     *
+     * @param request 包含 {@link SwitchModePayload} 的用户请求
+     */
+    private void handleSwitchMode(UserRequest request) {
+        SwitchModePayload payload = MapperHolder.mapper.convertValue(
+                request.getData(), SwitchModePayload.class);
+        boolean fullAuth = "FULL".equalsIgnoreCase(payload.getMode());
+        config.setFullAuthMode(fullAuth);
+        log.debug("授权模式切换为: {}", fullAuth ? "完全授权" : "普通授权");
+        TextPayload textPayload = new TextPayload();
+        textPayload.setContent("授权模式已切换为: " + (fullAuth ? "完全授权" : "普通授权"));
+        channel.send(LlmMessageType.TEXT, textPayload);
+    }
+
+    /**
+     * 处理 APPROVE 请求：批准或拒绝敏感工具调用。
+     * <p>
+     * 若批准则执行工具并通过 {@link LlmMessageType#TOOL_CALL_END} 发送结果；
+     * 若拒绝则发送 CANCELLED 状态。
+     *
+     * @param request 包含 {@link ApprovePayload} 的用户请求
+     */
+    private void handleApprove(UserRequest request) {
+        ApprovePayload payload = MapperHolder.mapper.convertValue(
+                request.getData(), ApprovePayload.class);
+        PendingApproval pending = null;
+        for (PendingApproval p : pendingOperations) {
+            if (p.getToolCallId().equals(payload.getToolCallId())) {
+                pending = p;
+                break;
+            }
+        }
+        if (pending == null) {
+            channel.sendError("未找到待批准的工具调用: " + payload.getToolCallId());
+            return;
+        }
+        pendingOperations.remove(pending);
+
+        ToolCallEndPayload endPayload = new ToolCallEndPayload();
+        endPayload.setId(pending.getToolCallId());
+        endPayload.setName(pending.getToolName());
+
+        if (payload.isApproved()) {
+            ToolContext toolContext = new ToolContext(Map.of("fullAuthMode", true));
+            try {
+                String result = pending.getCallback().call(
+                        MapperHolder.mapper.writeValueAsString(pending.getArguments()),
+                        toolContext);
+                endPayload.setResult(result);
+                endPayload.setStatus(ToolCallStatus.SUCCESS);
+            } catch (Exception e) {
+                endPayload.setStatus(ToolCallStatus.ERROR);
+                endPayload.setErrorMessage(e.getMessage());
+            }
+        } else {
+            endPayload.setStatus(ToolCallStatus.CANCELLED);
+            endPayload.setErrorMessage("用户拒绝了操作");
+        }
+        channel.send(LlmMessageType.TOOL_CALL_END, endPayload);
     }
 
     /**

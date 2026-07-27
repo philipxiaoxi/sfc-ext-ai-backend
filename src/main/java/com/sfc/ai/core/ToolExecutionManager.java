@@ -1,19 +1,27 @@
 package com.sfc.ai.core;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.sfc.ai.constant.LlmMessageType;
 import com.sfc.ai.core.channel.MessageChannel;
 import com.sfc.ai.core.tool.ChannelMediatedToolCallback;
+import com.sfc.ai.core.tool.PendingApproval;
 import com.sfc.ai.core.tool.RegisteredTool;
+import com.sfc.ai.core.tool.SensitiveToolRegistry;
 import com.sfc.ai.core.tool.ToolExecution;
+import com.sfc.ai.model.chat.payload.PermissionRequestPayload;
 import com.sfc.ai.model.chat.payload.ToolCallEndPayload;
 import com.sfc.ai.model.chat.payload.ToolCallStatus;
 import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
+import com.xiaotao.saltedfishcloud.utils.MapperHolder;
 import com.xiaotao.saltedfishcloud.utils.SecureUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.execution.ToolExecutionException;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -98,18 +106,42 @@ public class ToolExecutionManager {
      * @param toolCallId  工具调用 ID，与 {@link LlmMessageType#TOOL_CALL_START} 一致
      * @param toolName    工具名称
      * @param toolInput   工具输入参数（JSON 字符串）
-     * @param toolContext 工具上下文
-     * @param user        当前用户，用于绑定 Spring Security 上下文；可为 null
-     * @param channel     消息通道，用于发送 {@link LlmMessageType#TOOL_CALL_END}
+     * @param toolContext            工具上下文
+     * @param user                   当前用户，用于绑定 Spring Security 上下文；可为 null
+     * @param channel                消息通道，用于发送 {@link LlmMessageType#TOOL_CALL_END}
+     * @param sensitiveToolRegistry  敏感工具注册表
+     * @param pendingOps             待批准的操作列表
      * @return 工具执行结果；若已被 STOP 取消则返回占位中断结果
      */
     public String executeToolCall(ToolCallback callback, String toolCallId, String toolName,
                                    String toolInput, ToolContext toolContext,
-                                   UserPrincipal user, MessageChannel channel) {
+                                   UserPrincipal user, MessageChannel channel,
+                                   SensitiveToolRegistry sensitiveToolRegistry,
+                                   List<PendingApproval> pendingOps) {
         // 入口检查：若 STOP 已移除 announcedToolCalls 并发送 CANCELLED，则不再执行
         if (!announcedToolCalls.containsKey(toolCallId)) {
             log.debug("工具调用已被取消，跳过执行 id: {} name: {}", toolCallId, toolName);
             return "工具调用已被用户中断取消。";
+        }
+
+        // 敏感工具检查：完全授权模式通过 ToolContext 传递
+        boolean fullAuthMode = Boolean.TRUE.equals(toolContext.getContext().get("fullAuthMode"));
+        if (!fullAuthMode && sensitiveToolRegistry.isSensitive(toolName)) {
+            Map<String, Object> arguments = parseJsonArguments(toolInput);
+            String purpose = sensitiveToolRegistry.resolvePurpose(toolName, arguments);
+            PendingApproval pending = new PendingApproval(toolCallId, toolName, arguments, purpose, callback, Instant.now());
+            pendingOps.add(pending);
+
+            PermissionRequestPayload reqPayload = new PermissionRequestPayload();
+            reqPayload.setToolCallId(toolCallId);
+            reqPayload.setToolName(toolName);
+            reqPayload.setPurpose(purpose);
+            reqPayload.setArguments(arguments);
+            channel.send(LlmMessageType.PERMISSION_REQUEST, reqPayload);
+
+            // 从 announcedToolCalls 移除，让 cancelRunningTools 不再处理
+            announcedToolCalls.remove(toolCallId);
+            return "已通知用户，待批准执行";
         }
 
         Future<String> future = toolExecutor.submit(() -> {
@@ -268,5 +300,15 @@ public class ToolExecutionManager {
         payload.setStatus(ToolCallStatus.CANCELLED);
         payload.setErrorMessage(reason);
         channel.send(LlmMessageType.TOOL_CALL_END, payload);
+    }
+
+    private static Map<String, Object> parseJsonArguments(String toolInput) {
+        try {
+            return MapperHolder.mapper.readValue(toolInput,
+                    new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            log.warn("解析工具参数 JSON 失败: {}", e.getMessage());
+            return Map.of();
+        }
     }
 }

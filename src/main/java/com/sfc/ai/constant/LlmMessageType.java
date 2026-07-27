@@ -31,6 +31,9 @@ public enum LlmMessageType {
     /** 工具注册确认 */
     REGISTER_TOOL_ACK,
 
+    /** 请求用户批准敏感工具调用 */
+    PERMISSION_REQUEST,
+
     /** 错误 */
     ERROR
 }
