@@ -129,7 +129,7 @@ public class ToolExecutionManager {
         if (!fullAuthMode && sensitiveToolRegistry.isSensitive(toolName)) {
             Map<String, Object> arguments = parseJsonArguments(toolInput);
             String purpose = sensitiveToolRegistry.resolvePurpose(toolName, arguments);
-            PendingApproval pending = new PendingApproval(toolCallId, toolName, arguments, purpose, callback, Instant.now());
+            PendingApproval pending = new PendingApproval(toolCallId, toolName, arguments, purpose, callback, Instant.now(), user);
             pendingOps.add(pending);
 
             PermissionRequestPayload reqPayload = new PermissionRequestPayload();

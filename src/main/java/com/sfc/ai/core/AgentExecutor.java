@@ -20,7 +20,9 @@ import com.sfc.ai.model.chat.payload.ToolCallStatus;
 import com.sfc.ai.model.chat.message.UserRequest;
 import com.sfc.ai.service.AiConversationService;
 import com.xiaotao.saltedfishcloud.exception.JsonException;
+import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
 import com.xiaotao.saltedfishcloud.utils.MapperHolder;
+import com.xiaotao.saltedfishcloud.utils.SecureUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
@@ -320,7 +322,11 @@ public class AgentExecutor {
 
         if (payload.isApproved()) {
             ToolContext toolContext = new ToolContext(Map.of("fullAuthMode", true));
+            UserPrincipal user = pending.getUser();
             try {
+                if (user != null) {
+                    SecureUtils.bindUser(user);
+                }
                 String result = pending.getCallback().call(
                         MapperHolder.mapper.writeValueAsString(pending.getArguments()),
                         toolContext);
@@ -329,6 +335,10 @@ public class AgentExecutor {
             } catch (Exception e) {
                 endPayload.setStatus(ToolCallStatus.ERROR);
                 endPayload.setErrorMessage(e.getMessage());
+            } finally {
+                if (user != null) {
+                    SecureUtils.unbind();
+                }
             }
         } else {
             endPayload.setStatus(ToolCallStatus.CANCELLED);
