@@ -95,7 +95,8 @@ public class ChatRunner {
                 DefaultToolExecutionExceptionProcessor.builder().build(),
                 toolExecutionManager, channel, currentUser,
                 sensitiveToolRegistry, pendingOps,
-                config.isFullAuthMode());
+                config.isFullAuthMode(),
+                sessionContext.getConversationId());
 
         // 5. ChatClient 构造（与原 handleChat 一致）
         ChatClient chatClient = chatClientService.getChatClient(

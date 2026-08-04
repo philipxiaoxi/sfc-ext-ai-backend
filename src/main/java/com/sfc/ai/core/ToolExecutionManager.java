@@ -2,6 +2,7 @@ package com.sfc.ai.core;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.sfc.ai.constant.LlmMessageType;
+import com.sfc.ai.constant.SensitiveToolCallStatus;
 import com.sfc.ai.core.channel.MessageChannel;
 import com.sfc.ai.core.tool.ChannelMediatedToolCallback;
 import com.sfc.ai.core.tool.PendingApproval;
@@ -11,6 +12,8 @@ import com.sfc.ai.core.tool.ToolExecution;
 import com.sfc.ai.model.chat.payload.PermissionRequestPayload;
 import com.sfc.ai.model.chat.payload.ToolCallEndPayload;
 import com.sfc.ai.model.chat.payload.ToolCallStatus;
+import com.sfc.ai.model.po.SensitiveToolCallRecord;
+import com.sfc.ai.service.SensitiveToolCallRecordService;
 import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
 import com.xiaotao.saltedfishcloud.utils.MapperHolder;
 import com.xiaotao.saltedfishcloud.utils.SecureUtils;
@@ -70,6 +73,18 @@ public class ToolExecutionManager {
     private final ConcurrentHashMap<String, CompletableFuture<String>> pendingToolCalls = new ConcurrentHashMap<>();
     private final ExecutorService toolExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
+    /** 敏感工具调用记录服务 */
+    private final SensitiveToolCallRecordService recordService;
+
+    /**
+     * 构造工具执行管理器。
+     *
+     * @param recordService 敏感工具调用记录服务，用于记录 LLM 发起的敏感工具调用
+     */
+    public ToolExecutionManager(SensitiveToolCallRecordService recordService) {
+        this.recordService = recordService;
+    }
+
     /**
      * 声明一个即将开始的工具调用。
      * <p>
@@ -111,13 +126,15 @@ public class ToolExecutionManager {
      * @param channel                消息通道，用于发送 {@link LlmMessageType#TOOL_CALL_END}
      * @param sensitiveToolRegistry  敏感工具注册表
      * @param pendingOps             待批准的操作列表
+     * @param conversationId         当前 AI 会话 ID，用于调用记录
      * @return 工具执行结果；若已被 STOP 取消则返回占位中断结果
      */
     public String executeToolCall(ToolCallback callback, String toolCallId, String toolName,
                                    String toolInput, ToolContext toolContext,
                                    UserPrincipal user, MessageChannel channel,
                                    SensitiveToolRegistry sensitiveToolRegistry,
-                                   List<PendingApproval> pendingOps) {
+                                   List<PendingApproval> pendingOps,
+                                   String conversationId) {
         // 入口检查：若 STOP 已移除 announcedToolCalls 并发送 CANCELLED，则不再执行
         if (!announcedToolCalls.containsKey(toolCallId)) {
             log.debug("工具调用已被取消，跳过执行 id: {} name: {}", toolCallId, toolName);
@@ -126,9 +143,13 @@ public class ToolExecutionManager {
 
         // 敏感工具检查：完全授权模式通过 ToolContext 传递
         boolean fullAuthMode = Boolean.TRUE.equals(toolContext.getContext().get("fullAuthMode"));
-        if (!fullAuthMode && sensitiveToolRegistry.isSensitive(toolName)) {
-            Map<String, Object> arguments = parseJsonArguments(toolInput);
-            String purpose = sensitiveToolRegistry.resolvePurpose(toolName, arguments);
+        boolean isSensitive = sensitiveToolRegistry.isSensitive(toolName);
+        boolean approvedByUser = false;
+        Map<String, Object> arguments = null;
+        String purpose = null;
+        if (!fullAuthMode && isSensitive) {
+            arguments = parseJsonArguments(toolInput);
+            purpose = sensitiveToolRegistry.resolvePurpose(toolName, arguments);
             PendingApproval pending = new PendingApproval(toolCallId, toolName, arguments, purpose, callback, Instant.now(), user);
             pendingOps.add(pending);
 
@@ -139,9 +160,26 @@ public class ToolExecutionManager {
             reqPayload.setArguments(arguments);
             channel.send(LlmMessageType.PERMISSION_REQUEST, reqPayload);
 
-            // 从 announcedToolCalls 移除，让 cancelRunningTools 不再处理
-            announcedToolCalls.remove(toolCallId);
-            return "已通知用户，待批准执行";
+            // 阻塞等待用户批准/拒绝；连接关闭或用户中断时被取消并返回 null
+            Boolean decision = awaitApproval(pending, toolCallId);
+            if (decision == null) {
+                if (announcedToolCalls.remove(toolCallId) != null) {
+                    notifyEnd(channel, toolCallId, toolName, null, ToolCallStatus.CANCELLED, "工具调用已被取消");
+                }
+                return "工具调用已被用户中断取消。";
+            }
+            if (!decision) {
+                if (announcedToolCalls.remove(toolCallId) != null) {
+                    notifyEnd(channel, toolCallId, toolName, null, ToolCallStatus.CANCELLED, "用户拒绝了操作");
+                }
+                recordSensitiveCall(user, conversationId, toolName, arguments, purpose,
+                        SensitiveToolCallStatus.REJECTED, false, null);
+                return "用户拒绝了该操作，请勿执行。";
+            }
+            approvedByUser = true;
+        } else if (isSensitive) {
+            arguments = parseJsonArguments(toolInput);
+            purpose = sensitiveToolRegistry.resolvePurpose(toolName, arguments);
         }
 
         Future<String> future = toolExecutor.submit(() -> {
@@ -163,6 +201,11 @@ public class ToolExecutionManager {
             if (announcedToolCalls.remove(toolCallId) != null) {
                 runningToolCalls.remove(toolCallId);
                 notifyEnd(channel, toolCallId, toolName, result, ToolCallStatus.SUCCESS, null);
+                if (isSensitive) {
+                    recordSensitiveCall(user, conversationId, toolName, arguments, purpose,
+                            approvedByUser ? SensitiveToolCallStatus.APPROVED_EXECUTED : SensitiveToolCallStatus.AUTO_EXECUTED,
+                            true, result);
+                }
             }
             return result;
         } catch (CancellationException e) {
@@ -180,8 +223,13 @@ public class ToolExecutionManager {
             if (announcedToolCalls.remove(toolCallId) != null) {
                 runningToolCalls.remove(toolCallId);
                 Throwable cause = e.getCause();
-                notifyEnd(channel, toolCallId, toolName, null, ToolCallStatus.ERROR,
-                        cause != null ? cause.getMessage() : e.getMessage());
+                String errorMessage = cause != null ? cause.getMessage() : e.getMessage();
+                notifyEnd(channel, toolCallId, toolName, null, ToolCallStatus.ERROR, errorMessage);
+                if (isSensitive) {
+                    recordSensitiveCall(user, conversationId, toolName, arguments, purpose,
+                            approvedByUser ? SensitiveToolCallStatus.APPROVED_EXECUTED : SensitiveToolCallStatus.AUTO_EXECUTED,
+                            false, errorMessage);
+                }
             }
             Throwable cause = e.getCause();
             if (cause instanceof RuntimeException re) {
@@ -300,6 +348,60 @@ public class ToolExecutionManager {
         payload.setStatus(ToolCallStatus.CANCELLED);
         payload.setErrorMessage(reason);
         channel.send(LlmMessageType.TOOL_CALL_END, payload);
+    }
+
+    /**
+     * 阻塞等待用户对敏感工具调用的批准决策。
+     *
+     * @param pending    待批准的敏感工具调用记录
+     * @param toolCallId 工具调用 ID
+     * @return true 批准，false 拒绝，null 取消（连接关闭/用户中断/线程被中断）
+     */
+    private static Boolean awaitApproval(PendingApproval pending, String toolCallId) {
+        try {
+            return pending.awaitDecision();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            pending.cancel();
+            log.debug("等待批准被中断 id: {}", toolCallId);
+            return null;
+        }
+    }
+
+    /**
+     * 记录一次敏感工具调用。
+     * <p>
+     * 落库失败仅记录告警日志，不影响工具调用主流程。
+     *
+     * @param user           发起调用的用户，可为 null
+     * @param conversationId 当前 AI 会话 ID
+     * @param toolName       敏感工具名称
+     * @param arguments      工具调用参数
+     * @param purpose        工具用途说明
+     * @param status         调用状态（自动执行 / 批准执行 / 拒绝）
+     * @param success        是否执行成功
+     * @param result         工具执行结果或错误信息
+     */
+    private void recordSensitiveCall(UserPrincipal user, String conversationId, String toolName,
+                                     Map<String, Object> arguments, String purpose,
+                                     SensitiveToolCallStatus status, boolean success, String result) {
+        try {
+            SensitiveToolCallRecord record = new SensitiveToolCallRecord();
+            if (user != null) {
+                record.setUid(user.getId());
+                record.setUsername(user.getUsername());
+            }
+            record.setConversationId(conversationId);
+            record.setToolName(toolName);
+            record.setPurpose(purpose);
+            record.setArguments(MapperHolder.toJsonNoEx(arguments));
+            record.setStatus(status);
+            record.setSuccess(success);
+            record.setResult(result);
+            recordService.save(record);
+        } catch (Exception e) {
+            log.warn("记录敏感工具调用失败 tool: {} status: {}", toolName, status, e);
+        }
     }
 
     private static Map<String, Object> parseJsonArguments(String toolInput) {

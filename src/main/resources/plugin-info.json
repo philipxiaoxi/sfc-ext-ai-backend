@@ -7,5 +7,9 @@
   "type": "jar",
   "author": "philipxiaoxi, xiaotao233",
   "apiVersion": "3.1.2",
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "autoLoad": [
+    "index.umd.js",
+    "style.css"
+  ]
 }

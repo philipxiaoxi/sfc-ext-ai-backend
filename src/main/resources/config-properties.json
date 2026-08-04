@@ -15,5 +15,22 @@
         ]
       }
     ]
+  },
+  {
+    "name": "sensitive-tool-call",
+    "title": "敏感工具调用",
+    "nodes": [
+      {
+        "nodes": [
+          {
+            "name": "sensitive-tool-call-record",
+            "title": "敏感工具调用记录",
+            "inputType": "template",
+            "template": "sensitive-tool-call-record",
+            "defaultValue": ""
+          }
+        ]
+      }
+    ]
   }
 ]

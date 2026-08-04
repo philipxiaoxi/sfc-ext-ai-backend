@@ -15,19 +15,16 @@ import com.sfc.ai.model.chat.payload.StartSessionPayload;
 import com.sfc.ai.model.chat.payload.SwitchModePayload;
 import com.sfc.ai.model.chat.payload.TextPayload;
 import com.sfc.ai.model.chat.payload.ToolCallAckPayload;
-import com.sfc.ai.model.chat.payload.ToolCallEndPayload;
-import com.sfc.ai.model.chat.payload.ToolCallStatus;
 import com.sfc.ai.model.chat.message.UserRequest;
 import com.sfc.ai.service.AiConversationService;
+import com.sfc.ai.service.SensitiveToolCallRecordService;
 import com.xiaotao.saltedfishcloud.exception.JsonException;
-import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
 import com.xiaotao.saltedfishcloud.utils.MapperHolder;
-import com.xiaotao.saltedfishcloud.utils.SecureUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -66,7 +63,7 @@ public class AgentExecutor {
     private final AgentExecutorConfig config;
 
     /** 工具执行管理器，per-conn 状态 */
-    private final ToolExecutionManager toolExecutionManager = new ToolExecutionManager();
+    private final ToolExecutionManager toolExecutionManager;
 
     /** 会话上下文，per-conn 状态 */
     private final SessionContext sessionContext = new SessionContext();
@@ -74,8 +71,8 @@ public class AgentExecutor {
     /** 当前连接已注册的客户端中介工具集合（key 工具名 → value 工具回调），per-conn 状态 */
     private final Map<String, ToolCallback> registeredTools = new ConcurrentHashMap<>();
 
-    /** 待批准的操作列表 */
-    private final List<PendingApproval> pendingOperations = new ArrayList<>();
+    /** 待批准的操作列表（线程安全，执行线程阻塞等待期间由消息处理线程完成决策） */
+    private final List<PendingApproval> pendingOperations = Collections.synchronizedList(new ArrayList<>());
 
     /** 敏感工具注册表 */
     private final SensitiveToolRegistry sensitiveToolRegistry;
@@ -91,19 +88,23 @@ public class AgentExecutor {
      * @param compensator            记忆补偿修复器
      * @param aiConversationService 会话持久化服务
      * @param config                Agent 执行器配置
+     * @param sensitiveToolRegistry 敏感工具注册表
+     * @param recordService         敏感工具调用记录服务
      */
     public AgentExecutor(MessageChannel channel,
                           ChatRunner chatRunner,
                           ChatMemoryRepairer compensator,
                           AiConversationService aiConversationService,
                           AgentExecutorConfig config,
-                          SensitiveToolRegistry sensitiveToolRegistry) {
+                          SensitiveToolRegistry sensitiveToolRegistry,
+                          SensitiveToolCallRecordService recordService) {
         this.channel = channel;
         this.chatRunner = chatRunner;
         this.compensator = compensator;
         this.aiConversationService = aiConversationService;
         this.config = config;
         this.sensitiveToolRegistry = sensitiveToolRegistry;
+        this.toolExecutionManager = new ToolExecutionManager(recordService);
     }
 
     /**
@@ -126,6 +127,7 @@ public class AgentExecutor {
             return;
         }
         log.debug("关闭 Agent 执行器");
+        cancelPendingApprovals("执行器已关闭");
         toolExecutionManager.cancelAll("执行器已关闭，中断了工具调用", channel);
         toolExecutionManager.shutdown();
         sessionContext.dispose();
@@ -185,6 +187,7 @@ public class AgentExecutor {
 
         boolean isNew = !aiConversationService.existsByConversationId(sessionId);
         sessionContext.startSession(sessionId, channel.getUser(), isNew);
+        cancelPendingApprovals("会话已切换");
         channel.send(LlmMessageType.SESSION_ACK, new SessionAckPayload(sessionId));
     }
 
@@ -265,6 +268,7 @@ public class AgentExecutor {
      */
     private void handleStop() {
         sessionContext.stop();
+        cancelPendingApprovals("用户中断了工具调用");
         toolExecutionManager.cancelAll("用户中断了工具调用", channel);
         sessionContext.dispose();
         compensateDanglingToolCalls();
@@ -295,8 +299,9 @@ public class AgentExecutor {
     /**
      * 处理 APPROVE 请求：批准或拒绝敏感工具调用。
      * <p>
-     * 若批准则执行工具并通过 {@link LlmMessageType#TOOL_CALL_END} 发送结果；
-     * 若拒绝则发送 CANCELLED 状态。
+     * 仅负责完成 {@link PendingApproval} 的决策句柄解除阻塞等待中的工具调用线程，
+     * 工具的最终执行与 {@link LlmMessageType#TOOL_CALL_END} 通知由
+     * {@link ToolExecutionManager#executeToolCall} 中的阻塞线程负责。
      *
      * @param request 包含 {@link ApprovePayload} 的用户请求
      */
@@ -304,47 +309,40 @@ public class AgentExecutor {
         ApprovePayload payload = MapperHolder.mapper.convertValue(
                 request.getData(), ApprovePayload.class);
         PendingApproval pending = null;
-        for (PendingApproval p : pendingOperations) {
-            if (p.getToolCallId().equals(payload.getToolCallId())) {
-                pending = p;
-                break;
+        synchronized (pendingOperations) {
+            for (PendingApproval p : pendingOperations) {
+                if (p.getToolCallId().equals(payload.getToolCallId())) {
+                    pending = p;
+                    break;
+                }
+            }
+            if (pending != null) {
+                pendingOperations.remove(pending);
             }
         }
         if (pending == null) {
             channel.sendError("未找到待批准的工具调用: " + payload.getToolCallId());
             return;
         }
-        pendingOperations.remove(pending);
+        pending.complete(payload.isApproved());
+    }
 
-        ToolCallEndPayload endPayload = new ToolCallEndPayload();
-        endPayload.setId(pending.getToolCallId());
-        endPayload.setName(pending.getToolName());
-
-        if (payload.isApproved()) {
-            ToolContext toolContext = new ToolContext(Map.of("fullAuthMode", true));
-            UserPrincipal user = pending.getUser();
-            try {
-                if (user != null) {
-                    SecureUtils.bindUser(user);
-                }
-                String result = pending.getCallback().call(
-                        MapperHolder.mapper.writeValueAsString(pending.getArguments()),
-                        toolContext);
-                endPayload.setResult(result);
-                endPayload.setStatus(ToolCallStatus.SUCCESS);
-            } catch (Exception e) {
-                endPayload.setStatus(ToolCallStatus.ERROR);
-                endPayload.setErrorMessage(e.getMessage());
-            } finally {
-                if (user != null) {
-                    SecureUtils.unbind();
-                }
+    /**
+     * 取消所有待批准的敏感工具调用，解除阻塞中的调用线程。
+     * <p>
+     * 用于用户中断（STOP）、连接关闭、会话切换等场景，避免工具调用线程无限阻塞。
+     *
+     * @param reason 取消原因
+     */
+    private void cancelPendingApprovals(String reason) {
+        synchronized (pendingOperations) {
+            var it = pendingOperations.iterator();
+            while (it.hasNext()) {
+                it.next().cancel();
+                it.remove();
             }
-        } else {
-            endPayload.setStatus(ToolCallStatus.CANCELLED);
-            endPayload.setErrorMessage("用户拒绝了操作");
         }
-        channel.send(LlmMessageType.TOOL_CALL_END, endPayload);
+        log.debug("已取消待批准的敏感工具调用: {}", reason);
     }
 
     /**

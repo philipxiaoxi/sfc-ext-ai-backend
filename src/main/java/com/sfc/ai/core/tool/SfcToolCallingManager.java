@@ -82,6 +82,9 @@ public class SfcToolCallingManager implements ToolCallingManager {
 
     private final boolean fullAuthMode;
 
+    /** 当前 AI 会话 ID，用于敏感工具调用记录 */
+    private final String conversationId;
+
     /**
      * 构造工具调用管理器。
      *
@@ -94,6 +97,7 @@ public class SfcToolCallingManager implements ToolCallingManager {
      * @param sensitiveToolRegistry          敏感工具注册表
      * @param pendingOps                     待批准的操作列表
      * @param fullAuthMode                   是否完全授权模式，开启后敏感工具直接执行无需用户批准
+     * @param conversationId                 当前 AI 会话 ID，用于敏感工具调用记录
      */
     public SfcToolCallingManager(ToolCallbackResolver toolCallbackResolver,
                                  ToolExecutionExceptionProcessor toolExecutionExceptionProcessor,
@@ -102,7 +106,8 @@ public class SfcToolCallingManager implements ToolCallingManager {
                                  @Nullable UserPrincipal user,
                                  SensitiveToolRegistry sensitiveToolRegistry,
                                  List<PendingApproval> pendingOps,
-                                 boolean fullAuthMode) {
+                                 boolean fullAuthMode,
+                                 String conversationId) {
         this.toolCallbackResolver = toolCallbackResolver;
         this.toolExecutionExceptionProcessor = toolExecutionExceptionProcessor;
         this.executionManager = executionManager;
@@ -111,6 +116,7 @@ public class SfcToolCallingManager implements ToolCallingManager {
         this.sensitiveToolRegistry = sensitiveToolRegistry;
         this.pendingOps = pendingOps;
         this.fullAuthMode = fullAuthMode;
+        this.conversationId = conversationId;
     }
 
     @Override
@@ -265,7 +271,7 @@ public class SfcToolCallingManager implements ToolCallingManager {
         try {
             return executionManager.executeToolCall(toolCallback, toolCallId, toolName,
                     finalToolInputArguments, toolContext, user, channel,
-                    sensitiveToolRegistry, pendingOps);
+                    sensitiveToolRegistry, pendingOps, conversationId);
         } catch (ToolExecutionException ex) {
             return toolExecutionExceptionProcessor.process(ex);
         }
