@@ -100,6 +100,7 @@ WebSocket 握手时复用已有的 HTTP Session 认证信息（Spring Security�
 | `TOOL_CALL` | 工具调用（已废弃，由 TOOL_CALL_START + TOOL_CALL_END 替代） | `ToolCallPayload` |
 | `TOOL_CALL_REQ` | 工具调用请求（需要客户端执行并返回结果） | `ToolCallStartPayload` |
 | `PERMISSION_REQUEST` | 请求用户批准敏感工具调用 | `PermissionRequestPayload` |
+| `MODE_SWITCHED` | 授权模式切换确认 | `TextPayload` |
 | `REGISTER_TOOL_ACK` | 工具注册确认 | `String`（工具名称） |
 | `DONE` | 响应结束 | `DonePayload` |
 | `ERROR` | 错误消息 | `ErrorPayload` |
@@ -176,11 +177,12 @@ WebSocket 握手时复用已有的 HTTP Session 认证信息（Spring Security�
 
 ### TextPayload
 
-用于 `TEXT` 消息。
+用于 `TEXT` 消息，以及 `MODE_SWITCHED` 消息（授权模式切换确认，此时仅 `content` 字段有值）。
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `content` | `String` | 文本回复内容 |
+| `content` | `String` | 文本回复内容（`TEXT` 为 LLM 回复；`MODE_SWITCHED` 为切换提示，如 `"授权模式已切换为: 完全授权"`） |
+| `reasoningContent` | `String` | 思维链内容（仅 `TEXT` 消息使用，`MODE_SWITCHED` 不携带） |
 
 ```json
 {
@@ -538,7 +540,7 @@ WebSocket 握手时复用已有的 HTTP Session 认证信息（Spring Security�
 
 ```
   |--- SWITCH_MODE ------------------>|  {mode: "FULL"}
-  |<--- TEXT "授权模式已切换为: 完全授权"
+  |<--- MODE_SWITCHED "授权模式已切换为: 完全授权"
   |--- CHAT ------------------------>|
   |<--- TOOL_CALL_START -------------|  LLM 调用敏感工具
   |<--- TOOL_CALL_END ---------------|  直接执行，无需用户批准
@@ -547,7 +549,7 @@ WebSocket 握手时复用已有的 HTTP Session 认证信息（Spring Security�
 切换回普通授权：
 ```
   |--- SWITCH_MODE ------------------>|  {mode: "NORMAL"}
-  |<--- TEXT "授权模式已切换为: 普通授权"
+  |<--- MODE_SWITCHED "授权模式已切换为: 普通授权"
 ```
 
 > **注意**：授权模式仅对当前 WebSocket 连接生效，连接断开后重新建立时默认为普通授权模式。

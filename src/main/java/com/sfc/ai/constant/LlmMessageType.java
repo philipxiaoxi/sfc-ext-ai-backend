@@ -34,6 +34,9 @@ public enum LlmMessageType {
     /** 请求用户批准敏感工具调用 */
     PERMISSION_REQUEST,
 
+    /** 授权模式切换确认 */
+    MODE_SWITCHED,
+
     /** 错误 */
     ERROR
 }

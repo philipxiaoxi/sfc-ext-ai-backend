@@ -101,10 +101,10 @@ AI 工具调用权限审批系统为敏感操作（如删除、移动、复制�
 
 ### 切换响应
 
-服务端返回一条 TEXT 消息确认：
+服务端返回一条 `MODE_SWITCHED` 消息确认（payload 为 `TextPayload`，仅 `content` 字段有值）：
 
 ```
-← TEXT {content: "授权模式已切换为: 完全授权"}
+← MODE_SWITCHED {content: "授权模式已切换为: 完全授权"}
 ```
 
 ### 模式生命周期

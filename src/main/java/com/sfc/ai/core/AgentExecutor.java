@@ -282,6 +282,10 @@ public class AgentExecutor {
 
     /**
      * 处理 SWITCH_MODE 请求：切换当前 AI 会话的授权模式。
+     * <p>
+     * 切换确认通过独立的 {@link LlmMessageType#MODE_SWITCHED} 消息类型下发，
+     * 避免与 LLM 流式回复共用的 {@link LlmMessageType#TEXT} 混淆，导致前端
+     * 将系统提示合并进 LLM 消息气泡。
      *
      * @param request 包含 {@link SwitchModePayload} 的用户请求
      */
@@ -293,7 +297,7 @@ public class AgentExecutor {
         log.debug("授权模式切换为: {}", fullAuth ? "完全授权" : "普通授权");
         TextPayload textPayload = new TextPayload();
         textPayload.setContent("授权模式已切换为: " + (fullAuth ? "完全授权" : "普通授权"));
-        channel.send(LlmMessageType.TEXT, textPayload);
+        channel.send(LlmMessageType.MODE_SWITCHED, textPayload);
     }
 
     /**
