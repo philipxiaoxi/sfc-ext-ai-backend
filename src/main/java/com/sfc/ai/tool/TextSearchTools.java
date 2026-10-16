@@ -5,7 +5,7 @@ import com.xiaotao.saltedfishcloud.service.file.DiskFileSystem;
 import com.xiaotao.saltedfishcloud.service.file.DiskFileSystemManager;
 import com.xiaotao.saltedfishcloud.utils.DiskFileSystemUtils;
 import com.xiaotao.saltedfishcloud.utils.ResourceUtils;
-import com.xiaotao.saltedfishcloud.utils.StringUtils;
+import com.sfc.cloud.utils.SfcStringUtils;
 import org.jspecify.annotations.NonNull;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -122,7 +122,7 @@ public class TextSearchTools {
 
                 try {
                     Resource fileResource = getFileSystem().getResource(uid, parentPath, file.getName());
-                    NetDiskToolUtils.validateTextFile(fileResource, StringUtils.appendPath(parentPath, file.getName()));
+                    NetDiskToolUtils.validateTextFile(fileResource, SfcStringUtils.appendPath(parentPath, file.getName()));
                 } catch (Exception e) {
                     return FileVisitResult.CONTINUE;
                 }

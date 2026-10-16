@@ -1,7 +1,7 @@
 package com.sfc.ai.repo;
 
 import com.sfc.ai.model.po.LlmModel;
-import com.xiaotao.saltedfishcloud.dao.BaseRepo;
+import com.sfc.cloud.data.repo.SfcBaseRepo;
 
 import java.util.Collection;
 import java.util.List;
@@ -9,7 +9,7 @@ import java.util.List;
 /**
  * 模型数据仓库
  */
-public interface LlmModelRepo extends BaseRepo<LlmModel> {
+public interface LlmModelRepo extends SfcBaseRepo<LlmModel> {
 
     /**
      * 根据提供商 ID 查询关联的模型列表

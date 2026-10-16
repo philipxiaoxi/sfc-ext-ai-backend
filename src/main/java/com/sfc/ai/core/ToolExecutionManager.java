@@ -15,7 +15,7 @@ import com.sfc.ai.model.chat.payload.ToolCallStatus;
 import com.sfc.ai.model.po.SensitiveToolCallRecord;
 import com.sfc.ai.service.SensitiveToolCallRecordService;
 import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
-import com.xiaotao.saltedfishcloud.utils.MapperHolder;
+import com.sfc.cloud.utils.SfcMapperHolder;
 import com.xiaotao.saltedfishcloud.utils.SecureUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ToolContext;
@@ -394,7 +394,7 @@ public class ToolExecutionManager {
             record.setConversationId(conversationId);
             record.setToolName(toolName);
             record.setPurpose(purpose);
-            record.setArguments(MapperHolder.toJsonNoEx(arguments));
+            record.setArguments(SfcMapperHolder.toJsonNoEx(arguments));
             record.setStatus(status);
             record.setSuccess(success);
             record.setResult(result);
@@ -406,7 +406,7 @@ public class ToolExecutionManager {
 
     private static Map<String, Object> parseJsonArguments(String toolInput) {
         try {
-            return MapperHolder.mapper.readValue(toolInput,
+            return SfcMapperHolder.mapper.readValue(toolInput,
                     new TypeReference<Map<String, Object>>() {});
         } catch (Exception e) {
             log.warn("解析工具参数 JSON 失败: {}", e.getMessage());

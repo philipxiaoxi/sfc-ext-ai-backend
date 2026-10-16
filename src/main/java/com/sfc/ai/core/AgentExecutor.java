@@ -18,8 +18,8 @@ import com.sfc.ai.model.chat.payload.ToolCallAckPayload;
 import com.sfc.ai.model.chat.message.UserRequest;
 import com.sfc.ai.service.AiConversationService;
 import com.sfc.ai.service.SensitiveToolCallRecordService;
-import com.xiaotao.saltedfishcloud.exception.JsonException;
-import com.xiaotao.saltedfishcloud.utils.MapperHolder;
+import com.sfc.cloud.exception.SfcJsonException;
+import com.sfc.cloud.utils.SfcMapperHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.ToolCallback;
 
@@ -178,7 +178,7 @@ public class AgentExecutor {
      * @param request 包含 {@link StartSessionPayload} 的用户请求
      */
     private void handleStartSession(UserRequest request) {
-        StartSessionPayload startPayload = MapperHolder.mapper.convertValue(
+        StartSessionPayload startPayload = SfcMapperHolder.mapper.convertValue(
                 request.getData(), StartSessionPayload.class);
         String sessionId = startPayload.getSessionId();
         if (sessionId == null || sessionId.isBlank()) {
@@ -194,7 +194,7 @@ public class AgentExecutor {
     /**
      * 处理 CHAT 请求：校验会话与 payload，委托 {@link ChatRunner#run} 执行一次 LLM 调用全流程。
      * <p>
-     * {@link ChatRunner} 在内部抛出的 {@link JsonException}（来自 {@link LlmResolver} 解析失败）
+     * {@link ChatRunner} 在内部抛出的 {@link SfcJsonException}（来自 {@link LlmResolver} 解析失败）
      * 由本方法捕获并经 {@link MessageChannel#sendError(String)} 下发，不再上抛至
      * {@link #dispatch} 的 {@code catch (Throwable)}。
      *
@@ -205,7 +205,7 @@ public class AgentExecutor {
             channel.sendError("请先发送 START_SESSION 消息开启会话");
             return;
         }
-        ChatPayload chatData = MapperHolder.mapper.convertValue(request.getData(), ChatPayload.class);
+        ChatPayload chatData = SfcMapperHolder.mapper.convertValue(request.getData(), ChatPayload.class);
         if (chatData.getModelId() == null || chatData.getContent() == null) {
             channel.sendError("CHAT 消息缺少 modelId 或 content");
             return;
@@ -213,7 +213,7 @@ public class AgentExecutor {
         try {
             chatRunner.run(chatData, channel, sessionContext,
                     toolExecutionManager, registeredTools, config, pendingOperations);
-        } catch (JsonException e) {
+        } catch (SfcJsonException e) {
             channel.sendError(e.getMessage());
         }
     }
@@ -225,7 +225,7 @@ public class AgentExecutor {
      * @param request 包含 {@link RegisterToolPayload} 的用户请求
      */
     private void handleRegisterTool(UserRequest request) {
-        RegisterToolPayload payload = MapperHolder.mapper.convertValue(
+        RegisterToolPayload payload = SfcMapperHolder.mapper.convertValue(
                 request.getData(), RegisterToolPayload.class);
         registeredTools.put(payload.getName(),
                 toolExecutionManager.createChannelMediatedTool(
@@ -247,7 +247,7 @@ public class AgentExecutor {
      * @param request 包含 {@link ToolCallAckPayload} 的用户请求
      */
     private void handleToolAck(UserRequest request) {
-        ToolCallAckPayload ack = MapperHolder.mapper.convertValue(
+        ToolCallAckPayload ack = SfcMapperHolder.mapper.convertValue(
                 request.getData(), ToolCallAckPayload.class);
         if (!toolExecutionManager.acknowledge(ack.getId(), ack.getResult())) {
             log.warn("收到未知工具调用 ID 的 TOOL_ACK: {}", ack.getId());
@@ -290,7 +290,7 @@ public class AgentExecutor {
      * @param request 包含 {@link SwitchModePayload} 的用户请求
      */
     private void handleSwitchMode(UserRequest request) {
-        SwitchModePayload payload = MapperHolder.mapper.convertValue(
+        SwitchModePayload payload = SfcMapperHolder.mapper.convertValue(
                 request.getData(), SwitchModePayload.class);
         boolean fullAuth = "FULL".equalsIgnoreCase(payload.getMode());
         config.setFullAuthMode(fullAuth);
@@ -310,7 +310,7 @@ public class AgentExecutor {
      * @param request 包含 {@link ApprovePayload} 的用户请求
      */
     private void handleApprove(UserRequest request) {
-        ApprovePayload payload = MapperHolder.mapper.convertValue(
+        ApprovePayload payload = SfcMapperHolder.mapper.convertValue(
                 request.getData(), ApprovePayload.class);
         PendingApproval pending = null;
         synchronized (pendingOperations) {

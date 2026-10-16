@@ -1,14 +1,14 @@
 package com.sfc.ai.service;
 
 import com.sfc.ai.model.po.AiChatMemory;
-import com.xiaotao.saltedfishcloud.service.CrudService;
+import com.sfc.cloud.data.service.SfcCrudService;
 
 import java.util.List;
 
 /**
  * AI 聊天记忆服务接口。
  */
-public interface AiChatMemoryService extends CrudService<AiChatMemory> {
+public interface AiChatMemoryService extends SfcCrudService<AiChatMemory> {
 
     /**
      * 按会话 ID 查询所有消息（按 ID 升序排列）。

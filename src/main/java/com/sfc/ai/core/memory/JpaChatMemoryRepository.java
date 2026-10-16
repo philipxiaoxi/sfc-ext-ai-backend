@@ -6,7 +6,7 @@ import com.sfc.ai.core.message.ReasoningAssistantMessage;
 import com.sfc.ai.core.message.ReasoningContentSupport;
 import com.sfc.ai.model.po.AiChatMemory;
 import com.sfc.ai.repo.AiChatMemoryRepo;
-import com.xiaotao.saltedfishcloud.utils.MapperHolder;
+import com.sfc.cloud.utils.SfcMapperHolder;
 import org.jspecify.annotations.NonNull;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.messages.*;
@@ -139,7 +139,7 @@ public class JpaChatMemoryRepository implements ChatMemoryRepository {
 
     private String toJson(Object obj) {
         try {
-            return MapperHolder.mapper.writeValueAsString(obj);
+            return SfcMapperHolder.mapper.writeValueAsString(obj);
         } catch (JsonProcessingException e) {
             throw new RuntimeException("序列化消息数据失败", e);
         }
@@ -153,7 +153,7 @@ public class JpaChatMemoryRepository implements ChatMemoryRepository {
             return Map.of();
         }
         try {
-            return MapperHolder.mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+            return SfcMapperHolder.mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
         } catch (JsonProcessingException e) {
             throw new RuntimeException("反序列化消息元数据失败", e);
         }
@@ -167,7 +167,7 @@ public class JpaChatMemoryRepository implements ChatMemoryRepository {
             return List.of();
         }
         try {
-            return MapperHolder.mapper.readValue(json, typeRef);
+            return SfcMapperHolder.mapper.readValue(json, typeRef);
         } catch (JsonProcessingException e) {
             throw new RuntimeException("反序列化列表数据失败", e);
         }

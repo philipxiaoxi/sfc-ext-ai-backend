@@ -3,7 +3,7 @@ package com.sfc.ai.core.adapter;
 import com.sfc.ai.core.message.ReasoningContentSupport;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.model.po.LlmProvider;
-import com.xiaotao.saltedfishcloud.utils.StringUtils;
+import com.sfc.cloud.utils.SfcStringUtils;
 import org.jspecify.annotations.Nullable;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -64,7 +64,7 @@ public class DeepSeekChatAdapter implements LlmChatAdapter {
                         String reasoning = rcs.getReasoningContent();
                         return new DeepSeekAssistantMessage.Builder()
                                 .content(am.getText())
-                                .reasoningContent(StringUtils.hasText(reasoning) ? reasoning : null)
+                                .reasoningContent(SfcStringUtils.hasText(reasoning) ? reasoning : null)
                                 .properties(am.getMetadata())
                                 .toolCalls(am.getToolCalls())
                                 .media(am.getMedia())

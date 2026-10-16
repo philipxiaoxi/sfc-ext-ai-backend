@@ -1,7 +1,7 @@
 package com.sfc.ai.repo;
 
 import com.sfc.ai.model.po.AiChatMemory;
-import com.xiaotao.saltedfishcloud.dao.BaseRepo;
+import com.sfc.cloud.data.repo.SfcBaseRepo;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,7 +12,7 @@ import java.util.List;
 /**
  * 聊天记忆数据仓库。
  */
-public interface AiChatMemoryRepo extends BaseRepo<AiChatMemory> {
+public interface AiChatMemoryRepo extends SfcBaseRepo<AiChatMemory> {
 
     /**
      * 按会话 ID 查询所有消息（按 ID 升序排列）。

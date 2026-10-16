@@ -1,6 +1,6 @@
 package com.sfc.ai.core.advisor;
 
-import com.xiaotao.saltedfishcloud.utils.StringUtils;
+import com.sfc.cloud.utils.SfcStringUtils;
 import org.jspecify.annotations.NonNull;
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;
@@ -35,7 +35,7 @@ public abstract class SfcBaseAdvisor implements BaseAdvisor {
                 .stream()
                 .anyMatch(result -> {
                     String finishReason = result.getMetadata().getFinishReason();
-                    return StringUtils.hasText(finishReason) && !"_UNKNOWN".equals(finishReason);
+                    return SfcStringUtils.hasText(finishReason) && !"_UNKNOWN".equals(finishReason);
                 });
     }
 }

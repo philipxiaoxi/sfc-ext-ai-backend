@@ -1,6 +1,6 @@
 package com.sfc.ai.model.po;
 
-import com.xiaotao.saltedfishcloud.model.template.AuditModel;
+import com.sfc.cloud.data.model.SfcAuditModel;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -16,7 +16,7 @@ import lombok.Setter;
         @Index(name = "idx_ai_conversation_uid", columnList = "uid"),
         @Index(name = "idx_ai_conversation_conversation_id", columnList = "conversationId", unique = true)
 })
-public class AiConversation extends AuditModel {
+public class AiConversation extends SfcAuditModel {
     /** 会话 ID（对应 WebSocket 协议的 sessionId） */
     private String conversationId;
 

@@ -1,6 +1,6 @@
 package com.sfc.ai.core.adapter;
 
-import com.xiaotao.saltedfishcloud.exception.JsonException;
+import com.sfc.cloud.exception.SfcJsonException;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.LinkedHashMap;
@@ -51,12 +51,12 @@ public class LlmChatAdapterRegistry {
      *
      * @param id 适配器 ID
      * @return 适配器实例
-     * @throws JsonException 如果找不到对应适配器
+     * @throws SfcJsonException 如果找不到对应适配器
      */
     public LlmChatAdapter getAdapter(String id) {
         LlmChatAdapter adapter = adapterMap.get(id);
         if (adapter == null) {
-            throw new JsonException("不支持的适配器: " + id);
+            throw new SfcJsonException("不支持的适配器: " + id);
         }
         return adapter;
     }

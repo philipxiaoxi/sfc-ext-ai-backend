@@ -8,10 +8,10 @@ import com.sfc.ai.model.vo.HistoryMessageVo;
 import com.sfc.ai.repo.AiConversationRepo;
 import com.sfc.ai.service.AiChatMemoryService;
 import com.sfc.ai.service.AiConversationService;
-import com.xiaotao.saltedfishcloud.exception.JsonException;
-import com.xiaotao.saltedfishcloud.service.CrudServiceImpl;
-import com.xiaotao.saltedfishcloud.utils.MapperHolder;
-import com.xiaotao.saltedfishcloud.utils.StringUtils;
+import com.sfc.cloud.exception.SfcJsonException;
+import com.sfc.cloud.data.service.SfcCrudServiceImpl;
+import com.sfc.cloud.utils.SfcMapperHolder;
+import com.sfc.cloud.utils.SfcStringUtils;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
@@ -25,7 +25,7 @@ import java.util.Map;
 /**
  * AI 对话记录服务实现。
  */
-public class AiConversationServiceImpl extends CrudServiceImpl<AiConversation, AiConversationRepo> implements AiConversationService {
+public class AiConversationServiceImpl extends SfcCrudServiceImpl<AiConversation, AiConversationRepo> implements AiConversationService {
 
     @Autowired
     private AiChatMemoryService aiChatMemoryService;
@@ -51,7 +51,7 @@ public class AiConversationServiceImpl extends CrudServiceImpl<AiConversation, A
     @Override
     public ConversationHistoryVo getConversationMessages(String conversationId) {
         AiConversation conversation = aiConversationRepo.findByConversationId(conversationId)
-                .orElseThrow(() -> new JsonException("会话不存在"));
+                .orElseThrow(() -> new SfcJsonException("会话不存在"));
 
         List<AiChatMemory> memories = aiChatMemoryService.findByConversationIdOrderById(conversationId);
 
@@ -86,12 +86,12 @@ public class AiConversationServiceImpl extends CrudServiceImpl<AiConversation, A
 
                 case ASSISTANT -> {
                     // 1) 先输出 AI 正文与思考内容
-                    if (StringUtils.hasText(mem.getContent()) || StringUtils.hasText(mem.getReasoningContent())) {
+                    if (SfcStringUtils.hasText(mem.getContent()) || SfcStringUtils.hasText(mem.getReasoningContent())) {
                         result.add(HistoryMessageVo.ai(mem.getContent(), mem.getReasoningContent()));
                     }
 
                     // 2) 再输出工具调用条目
-                    if (StringUtils.hasText(mem.getToolCallData())) {
+                    if (SfcStringUtils.hasText(mem.getToolCallData())) {
                         List<AssistantMessage.ToolCall> toolCalls = parseToolCallData(mem.getToolCallData());
                         if (toolCalls != null) {
                             for (AssistantMessage.ToolCall tc : toolCalls) {
@@ -106,7 +106,7 @@ public class AiConversationServiceImpl extends CrudServiceImpl<AiConversation, A
 
                 case TOOL -> {
                     // 匹配并更新对应工具条目的结果
-                    if (StringUtils.hasText(mem.getToolCallData())) {
+                    if (SfcStringUtils.hasText(mem.getToolCallData())) {
                         List<ToolResponseMessage.ToolResponse> responses = parseToolResponseData(mem.getToolCallData());
                         if (responses != null) {
                             for (ToolResponseMessage.ToolResponse resp : responses) {
@@ -127,7 +127,7 @@ public class AiConversationServiceImpl extends CrudServiceImpl<AiConversation, A
 
     private List<AssistantMessage.ToolCall> parseToolCallData(String json) {
         try {
-            return MapperHolder.mapper.readValue(json, new TypeReference<List<AssistantMessage.ToolCall>>() {});
+            return SfcMapperHolder.mapper.readValue(json, new TypeReference<List<AssistantMessage.ToolCall>>() {});
         } catch (Exception e) {
             return null;
         }
@@ -135,7 +135,7 @@ public class AiConversationServiceImpl extends CrudServiceImpl<AiConversation, A
 
     private List<ToolResponseMessage.ToolResponse> parseToolResponseData(String json) {
         try {
-            return MapperHolder.mapper.readValue(json, new TypeReference<List<ToolResponseMessage.ToolResponse>>() {});
+            return SfcMapperHolder.mapper.readValue(json, new TypeReference<List<ToolResponseMessage.ToolResponse>>() {});
         } catch (Exception e) {
             return null;
         }
@@ -143,7 +143,7 @@ public class AiConversationServiceImpl extends CrudServiceImpl<AiConversation, A
 
     private String toJson(Object obj) {
         try {
-            return MapperHolder.mapper.writeValueAsString(obj);
+            return SfcMapperHolder.mapper.writeValueAsString(obj);
         } catch (Exception e) {
             return null;
         }

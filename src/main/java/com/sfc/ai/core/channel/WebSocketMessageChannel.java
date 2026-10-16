@@ -5,7 +5,7 @@ import com.sfc.ai.model.chat.message.LlmResponse;
 import com.sfc.ai.model.chat.message.UserRequest;
 import com.sfc.ai.model.chat.payload.ErrorPayload;
 import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
-import com.xiaotao.saltedfishcloud.utils.MapperHolder;
+import com.sfc.cloud.utils.SfcMapperHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.web.socket.TextMessage;
@@ -43,7 +43,7 @@ public class WebSocketMessageChannel implements MessageChannel {
      */
     public void receive(String rawPayload) {
         try {
-            UserRequest request = MapperHolder.parseJson(rawPayload, UserRequest.class);
+            UserRequest request = SfcMapperHolder.parseJson(rawPayload, UserRequest.class);
             if (handler != null) {
                 handler.onMessage(request);
             }
@@ -58,7 +58,7 @@ public class WebSocketMessageChannel implements MessageChannel {
         LlmResponse response = new LlmResponse();
         response.setType(type);
         response.setData(data);
-        queue.add(new TextMessage(MapperHolder.toJsonNoEx(response)));
+        queue.add(new TextMessage(SfcMapperHolder.toJsonNoEx(response)));
         tryDrain();
     }
 

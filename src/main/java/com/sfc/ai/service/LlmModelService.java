@@ -1,7 +1,7 @@
 package com.sfc.ai.service;
 
 import com.sfc.ai.model.po.LlmModel;
-import com.xiaotao.saltedfishcloud.service.CrudService;
+import com.sfc.cloud.data.service.SfcCrudService;
 
 import java.util.Collection;
 import java.util.List;
@@ -9,7 +9,7 @@ import java.util.List;
 /**
  * 模型服务接口
  */
-public interface LlmModelService extends CrudService<LlmModel> {
+public interface LlmModelService extends SfcCrudService<LlmModel> {
 
     /**
      * 根据提供商 ID 查询模型列表

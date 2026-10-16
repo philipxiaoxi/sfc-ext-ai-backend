@@ -1,6 +1,6 @@
 package com.sfc.ai.tool;
 
-import com.xiaotao.saltedfishcloud.constant.UserConstants;
+import com.sfc.cloud.constant.SfcUserConstants;
 import com.xiaotao.saltedfishcloud.model.po.file.FileInfo;
 import com.xiaotao.saltedfishcloud.service.file.DiskFileSystemManager;
 import org.springframework.ai.chat.model.ToolContext;

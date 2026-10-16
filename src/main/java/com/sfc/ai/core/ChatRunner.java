@@ -13,7 +13,7 @@ import com.sfc.ai.model.chat.payload.ChatPayload;
 import com.sfc.ai.model.chat.payload.DonePayload;
 import com.sfc.ai.model.chat.payload.TextPayload;
 import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
-import com.xiaotao.saltedfishcloud.utils.StringUtils;
+import com.sfc.cloud.utils.SfcStringUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -165,7 +165,7 @@ public class ChatRunner {
      */
     private static boolean hasContent(LlmResponse response) {
         TextPayload data = (TextPayload) response.getData();
-        return StringUtils.hasText(data.getContent())
-                || StringUtils.hasText(data.getReasoningContent());
+        return SfcStringUtils.hasText(data.getContent())
+                || SfcStringUtils.hasText(data.getReasoningContent());
     }
 }

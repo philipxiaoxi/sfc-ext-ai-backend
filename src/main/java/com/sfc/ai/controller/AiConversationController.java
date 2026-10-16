@@ -3,10 +3,9 @@ package com.sfc.ai.controller;
 import com.sfc.ai.model.po.AiConversation;
 import com.sfc.ai.model.vo.ConversationHistoryVo;
 import com.sfc.ai.service.AiConversationService;
-import com.xiaotao.saltedfishcloud.exception.JsonException;
-import com.xiaotao.saltedfishcloud.model.json.JsonResult;
-import com.xiaotao.saltedfishcloud.model.json.JsonResultImpl;
-import com.xiaotao.saltedfishcloud.validator.UIDValidator;
+import com.sfc.cloud.exception.SfcJsonException;
+import com.sfc.cloud.model.json.SfcJsonResult;
+import com.sfc.cloud.data.validation.SfcUIDValidator;
 import com.xiaotao.saltedfishcloud.utils.SecureUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,9 +29,9 @@ public class AiConversationController {
      * 获取当前用户的对话列表，按更新时间降序排列。
      */
     @GetMapping("list")
-    public JsonResult<List<AiConversation>> list() {
+    public SfcJsonResult<List<AiConversation>> list() {
         Long uid = SecureUtils.getCurrentUid();
-        return JsonResultImpl.getInstance(aiConversationService.findByUidOrderByUpdateAtDesc(uid));
+        return SfcJsonResult.getInstance(aiConversationService.findByUidOrderByUpdateAtDesc(uid));
     }
 
     /**
@@ -45,12 +44,12 @@ public class AiConversationController {
      * @return 会话历史 VO
      */
     @GetMapping("messages")
-    public JsonResult<ConversationHistoryVo> getMessages(@RequestParam String conversationId) {
+    public SfcJsonResult<ConversationHistoryVo> getMessages(@RequestParam String conversationId) {
         AiConversation conversation = aiConversationService.findByConversationId(conversationId);
         if (conversation == null) {
-            throw new JsonException("会话不存在");
+            throw new SfcJsonException("会话不存在");
         }
-        UIDValidator.validateWithException(conversation.getUid(), true);
-        return JsonResultImpl.getInstance(aiConversationService.getConversationMessages(conversationId));
+        SfcUIDValidator.validateWithException(conversation.getUid(), true);
+        return SfcJsonResult.getInstance(aiConversationService.getConversationMessages(conversationId));
     }
 }

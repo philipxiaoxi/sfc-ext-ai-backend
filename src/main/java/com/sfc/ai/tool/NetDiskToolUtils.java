@@ -1,6 +1,6 @@
 package com.sfc.ai.tool;
 
-import com.xiaotao.saltedfishcloud.constant.UserConstants;
+import com.sfc.cloud.constant.SfcUserConstants;
 import com.xiaotao.saltedfishcloud.utils.SecureUtils;
 import org.springframework.core.io.Resource;
 
@@ -24,7 +24,7 @@ public final class NetDiskToolUtils {
      */
     public static long resolveUid(String disk) {
         return switch (disk) {
-            case "public" -> UserConstants.PUBLIC_USER_ID;
+            case "public" -> SfcUserConstants.PUBLIC_USER_ID;
             case "private" -> {
                 Long uid = SecureUtils.getCurrentUid();
                 if (uid == null) {

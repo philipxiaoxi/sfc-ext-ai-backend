@@ -1,7 +1,7 @@
 package com.sfc.ai.model.po;
 
 import com.sfc.ai.constant.SensitiveToolCallStatus;
-import com.xiaotao.saltedfishcloud.model.template.AuditModel;
+import com.sfc.cloud.data.model.SfcAuditModel;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -23,7 +23,7 @@ import lombok.Setter;
 @Table(indexes = {
         @Index(name = "idx_sensitive_tool_call_record_uid_create_at", columnList = "uid,createAt")
 })
-public class SensitiveToolCallRecord extends AuditModel {
+public class SensitiveToolCallRecord extends SfcAuditModel {
 
     /**
      * 发起调用的用户名（冗余存储，便于审计展示）

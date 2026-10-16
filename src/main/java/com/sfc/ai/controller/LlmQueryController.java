@@ -6,8 +6,7 @@ import com.sfc.ai.model.vo.ProviderVo;
 import com.sfc.ai.model.vo.ProviderWithModelsVo;
 import com.sfc.ai.service.LlmModelService;
 import com.sfc.ai.service.LlmProviderService;
-import com.xiaotao.saltedfishcloud.model.json.JsonResult;
-import com.xiaotao.saltedfishcloud.model.json.JsonResultImpl;
+import com.sfc.cloud.model.json.SfcJsonResult;
 import com.xiaotao.saltedfishcloud.utils.SecureUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,7 +38,7 @@ public class LlmQueryController {
      * @return 提供商及其模型列表
      */
     @GetMapping("providersWithModels")
-    public JsonResult<List<ProviderWithModelsVo>> getProvidersWithModels() {
+    public SfcJsonResult<List<ProviderWithModelsVo>> getProvidersWithModels() {
         Long currentUid = SecureUtils.getCurrentUid();
 
         List<Long> uids = new ArrayList<>();
@@ -51,7 +50,7 @@ public class LlmQueryController {
         List<LlmProvider> providers = llmProviderService.findByUidIn(uids);
 
         if (providers.isEmpty()) {
-            return JsonResultImpl.getInstance(List.of());
+            return SfcJsonResult.getInstance(List.of());
         }
 
         List<Long> providerIds = providers.stream()
@@ -70,6 +69,6 @@ public class LlmQueryController {
                 ))
                 .collect(Collectors.toList());
 
-        return JsonResultImpl.getInstance(result);
+        return SfcJsonResult.getInstance(result);
     }
 }

@@ -2,14 +2,14 @@ package com.sfc.ai.service;
 
 import com.sfc.ai.model.po.AiConversation;
 import com.sfc.ai.model.vo.ConversationHistoryVo;
-import com.xiaotao.saltedfishcloud.service.CrudService;
+import com.sfc.cloud.data.service.SfcCrudService;
 
 import java.util.List;
 
 /**
  * AI 对话记录服务接口。
  */
-public interface AiConversationService extends CrudService<AiConversation> {
+public interface AiConversationService extends SfcCrudService<AiConversation> {
     /**
      * 按用户查询所有对话记录，按更新时间降序排列。
      *
@@ -42,7 +42,7 @@ public interface AiConversationService extends CrudService<AiConversation> {
      *
      * @param conversationId 会话 ID
      * @return 对话历史 VO
-     * @throws com.xiaotao.saltedfishcloud.exception.JsonException 若会话不存在
+     * @throws com.sfc.cloud.exception.SfcJsonException 若会话不存在
      */
     ConversationHistoryVo getConversationMessages(String conversationId);
 }

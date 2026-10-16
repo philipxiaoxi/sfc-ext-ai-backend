@@ -1,6 +1,6 @@
 package com.sfc.ai.model.param;
 
-import com.xiaotao.saltedfishcloud.model.param.PageableRequest;
+import com.sfc.cloud.model.param.SfcPageableRequest;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -9,7 +9,7 @@ import lombok.Setter;
  */
 @Getter
 @Setter
-public class SensitiveToolCallQueryParam extends PageableRequest {
+public class SensitiveToolCallQueryParam extends SfcPageableRequest {
 
     /**
      * 按用户 ID 筛选（可选）

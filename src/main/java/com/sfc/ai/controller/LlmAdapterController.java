@@ -2,8 +2,7 @@ package com.sfc.ai.controller;
 
 import com.sfc.ai.core.adapter.AdapterInfo;
 import com.sfc.ai.core.adapter.LlmChatAdapterRegistry;
-import com.xiaotao.saltedfishcloud.model.json.JsonResult;
-import com.xiaotao.saltedfishcloud.model.json.JsonResultImpl;
+import com.sfc.cloud.model.json.SfcJsonResult;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,7 +26,7 @@ public class LlmAdapterController {
      * @return 适配器信息列表，每项包含 id、name、icon
      */
     @GetMapping("list")
-    public JsonResult<List<AdapterInfo>> list() {
-        return JsonResultImpl.getInstance(adapterRegistry.listAdapters());
+    public SfcJsonResult<List<AdapterInfo>> list() {
+        return SfcJsonResult.getInstance(adapterRegistry.listAdapters());
     }
 }

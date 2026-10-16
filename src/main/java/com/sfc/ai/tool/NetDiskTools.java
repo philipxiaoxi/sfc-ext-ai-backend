@@ -9,7 +9,7 @@ import com.xiaotao.saltedfishcloud.service.file.DiskFileSystem;
 import com.xiaotao.saltedfishcloud.service.file.DiskFileSystemManager;
 import com.xiaotao.saltedfishcloud.utils.DiskFileSystemUtils;
 import com.xiaotao.saltedfishcloud.utils.ResourceUtils;
-import com.xiaotao.saltedfishcloud.utils.StringUtils;
+import com.sfc.cloud.utils.SfcStringUtils;
 import org.jspecify.annotations.NonNull;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -293,7 +293,7 @@ public class NetDiskTools {
     private List<Object[]> readAllLines(long uid, String path, String name) throws IOException {
         Resource resource = getFileSystem().getResource(uid, path, name);
         if (resource == null) {
-            throw new IllegalArgumentException("文件不存在: " + StringUtils.appendPath(path, name));
+            throw new IllegalArgumentException("文件不存在: " + SfcStringUtils.appendPath(path, name));
         }
         String content = ResourceUtils.resourceToString(resource);
         List<Object[]> lines = new ArrayList<>();
@@ -332,10 +332,10 @@ public class NetDiskTools {
             @ToolParam(description = "结束行号（包含，推荐 startLine 与 endLine 间隔不超过200行）") Integer endLine) throws IOException {
         long uid = NetDiskToolUtils.resolveUid(disk);
         Resource resource = getFileSystem().getResource(uid, path, name);
-        NetDiskToolUtils.validateTextFile(resource, StringUtils.appendPath(path, name));
+        NetDiskToolUtils.validateTextFile(resource, SfcStringUtils.appendPath(path, name));
 
         if (resource == null) {
-            throw new IllegalArgumentException("文件不存在: " + StringUtils.appendPath(path, name));
+            throw new IllegalArgumentException("文件不存在: " + SfcStringUtils.appendPath(path, name));
         }
 
         if (startLine == null || startLine < 1) {
@@ -389,7 +389,7 @@ public class NetDiskTools {
             @ToolParam(description = "要写入的完整文本内容") String content) {
         try {
             long uid = NetDiskToolUtils.resolveUid(disk);
-            NetDiskToolUtils.validateTextFile(getFileSystem().getResource(uid, path, name), StringUtils.appendPath(path, name));
+            NetDiskToolUtils.validateTextFile(getFileSystem().getResource(uid, path, name), SfcStringUtils.appendPath(path, name));
 
             FileInfo fileInfo = new FileInfo();
             long now = System.currentTimeMillis();
@@ -428,7 +428,7 @@ public class NetDiskTools {
         try {
             long uid = NetDiskToolUtils.resolveUid(disk);
             Resource resource = getFileSystem().getResource(uid, path, name);
-            NetDiskToolUtils.validateTextFile(resource, StringUtils.appendPath(path, name));
+            NetDiskToolUtils.validateTextFile(resource, SfcStringUtils.appendPath(path, name));
             if (lineNumber == null || lineNumber < 1) {
                 return "插入失败: lineNumber 必须大于等于1";
             }
@@ -502,7 +502,7 @@ public class NetDiskTools {
         try {
             long uid = NetDiskToolUtils.resolveUid(disk);
             Resource resource = getFileSystem().getResource(uid, path, name);
-            NetDiskToolUtils.validateTextFile(resource, StringUtils.appendPath(path, name));
+            NetDiskToolUtils.validateTextFile(resource, SfcStringUtils.appendPath(path, name));
             if (startLine == null || startLine < 1) {
                 return "替换失败: startLine 必须大于等于1";
             }

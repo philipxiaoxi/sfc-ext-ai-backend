@@ -1,6 +1,6 @@
 package com.sfc.ai.model.po;
 
-import com.xiaotao.saltedfishcloud.model.template.AuditModel;
+import com.sfc.cloud.data.model.SfcAuditModel;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -14,7 +14,7 @@ import lombok.Setter;
 @Table(indexes = {
         @Index(name = "idx_llm_model_llm_provider_id", columnList = "llmProviderId")
 })
-public class LlmModel extends AuditModel {
+public class LlmModel extends SfcAuditModel {
 
     /**
      * 关联的提供商 ID

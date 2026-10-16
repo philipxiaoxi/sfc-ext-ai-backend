@@ -1,7 +1,7 @@
 package com.sfc.ai.repo;
 
 import com.sfc.ai.model.po.AiConversation;
-import com.xiaotao.saltedfishcloud.dao.BaseRepo;
+import com.sfc.cloud.data.repo.SfcBaseRepo;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -11,7 +11,7 @@ import java.util.Optional;
 /**
  * AI 对话记录数据仓库。
  */
-public interface AiConversationRepo extends BaseRepo<AiConversation> {
+public interface AiConversationRepo extends SfcBaseRepo<AiConversation> {
     /**
      * 判断指定会话 ID 是否已存在。
      *

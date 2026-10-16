@@ -1,7 +1,7 @@
 package com.sfc.ai.model.po;
 
 import com.sfc.ai.core.adapter.LlmChatAdapter;
-import com.xiaotao.saltedfishcloud.model.template.AuditModel;
+import com.sfc.cloud.data.model.SfcAuditModel;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -15,7 +15,7 @@ import lombok.Setter;
 @Table(indexes = {
         @Index(name = "idx_llm_provider_name", columnList = "name")
 })
-public class LlmProvider extends AuditModel {
+public class LlmProvider extends SfcAuditModel {
 
     /**
      * 提供商名称

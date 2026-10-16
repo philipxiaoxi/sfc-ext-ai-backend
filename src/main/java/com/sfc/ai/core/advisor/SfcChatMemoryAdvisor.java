@@ -3,7 +3,7 @@ package com.sfc.ai.core.advisor;
 import com.sfc.ai.core.adapter.LlmChatAdapter;
 import com.sfc.ai.core.memory.ChatMemoryRepairer;
 import com.sfc.ai.core.message.ReasoningAssistantMessage;
-import com.xiaotao.saltedfishcloud.utils.StringUtils;
+import com.sfc.cloud.utils.SfcStringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.ai.chat.client.ChatClientRequest;
@@ -46,13 +46,13 @@ public class SfcChatMemoryAdvisor extends SfcBaseAdvisor implements BaseChatMemo
         private final StringBuilder textBuilder = new StringBuilder();
 
         public void addReasoning(String reasoningBuilder) {
-            if (StringUtils.hasText(reasoningBuilder)) {
+            if (SfcStringUtils.hasText(reasoningBuilder)) {
                 this.reasoningBuilder.append(reasoningBuilder);
             }
         }
 
         public void addText(String text) {
-            if (StringUtils.hasText(text)) {
+            if (SfcStringUtils.hasText(text)) {
                 this.textBuilder.append(text);
             }
         }

@@ -3,10 +3,9 @@ package com.sfc.ai.controller;
 import com.sfc.ai.model.param.SensitiveToolCallQueryParam;
 import com.sfc.ai.model.po.SensitiveToolCallRecord;
 import com.sfc.ai.service.SensitiveToolCallRecordService;
-import com.xiaotao.saltedfishcloud.constant.SysRole;
-import com.xiaotao.saltedfishcloud.model.CommonPageInfo;
-import com.xiaotao.saltedfishcloud.model.json.JsonResult;
-import com.xiaotao.saltedfishcloud.model.json.JsonResultImpl;
+import com.sfc.cloud.constant.SfcSysRole;
+import com.sfc.cloud.model.SfcPageInfo;
+import com.sfc.cloud.model.json.SfcJsonResult;
 import jakarta.annotation.security.RolesAllowed;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,8 +29,8 @@ public class SensitiveToolCallRecordController {
      * @return 分页的调用记录
      */
     @GetMapping("records")
-    @RolesAllowed(SysRole.ADMIN)
-    public JsonResult<CommonPageInfo<SensitiveToolCallRecord>> listRecords(SensitiveToolCallQueryParam param) {
-        return JsonResultImpl.getInstance(recordService.listRecords(param));
+    @RolesAllowed(SfcSysRole.ADMIN)
+    public SfcJsonResult<SfcPageInfo<SensitiveToolCallRecord>> listRecords(SensitiveToolCallQueryParam param) {
+        return SfcJsonResult.getInstance(recordService.listRecords(param));
     }
 }

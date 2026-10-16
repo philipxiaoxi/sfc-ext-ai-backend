@@ -1,6 +1,6 @@
 package com.sfc.ai.model.po;
 
-import com.xiaotao.saltedfishcloud.model.template.AuditModel;
+import com.sfc.cloud.data.model.SfcAuditModel;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -19,7 +19,7 @@ import org.springframework.ai.chat.messages.MessageType;
         @Index(name = "idx_chat_memory_conversation_id", columnList = "conversationId"),
         @Index(name = "idx_chat_memory_uid", columnList = "uid")
 })
-public class AiChatMemory extends AuditModel {
+public class AiChatMemory extends SfcAuditModel {
 
     /**
      * 会话标识
