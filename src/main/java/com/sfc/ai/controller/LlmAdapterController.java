@@ -2,7 +2,7 @@ package com.sfc.ai.controller;
 
 import com.sfc.ai.core.adapter.AdapterInfo;
 import com.sfc.ai.core.adapter.LlmChatAdapterRegistry;
-import com.sfc.cloud.model.json.SfcJsonResult;
+import com.sfc.common.model.json.SfcJsonResult;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

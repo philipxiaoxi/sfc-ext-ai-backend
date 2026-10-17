@@ -2,7 +2,7 @@ package com.sfc.ai.core.channel;
 
 import com.sfc.ai.constant.LlmMessageType;
 import com.sfc.ai.model.chat.message.UserRequest;
-import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
+import com.sfc.common.model.UserPrincipal;
 
 /**
  * AI 聊天消息通道接口，抽象消息的收发传输层。
@@ -47,7 +47,13 @@ public interface MessageChannel {
     /** 关闭通道，释放底层资源。 */
     void close();
 
-    /** 获取当前认证用户。 */
+    /**
+     * 获取当前认证用户。
+     *
+     * <p>微服务口径：身份来自网关注入的信任头 {@code X-Sfc-Uid}，不再是宿主 Spring Security 上下文。</p>
+     *
+     * @return 当前用户主体；无法确定身份时返回 {@code null}
+     */
     UserPrincipal getUser();
 
     /** 入站消息处理器。 */

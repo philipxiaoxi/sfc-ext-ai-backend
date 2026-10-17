@@ -1,6 +1,6 @@
 package com.sfc.ai.model.param;
 
-import com.sfc.cloud.model.param.SfcPageableRequest;
+import com.sfc.common.model.param.SfcPageableRequest;
 import lombok.Getter;
 import lombok.Setter;
 

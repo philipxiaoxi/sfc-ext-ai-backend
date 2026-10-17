@@ -1,6 +1,6 @@
 package com.sfc.ai.model.chat.session;
 
-import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
+import com.sfc.common.model.UserPrincipal;
 import lombok.Getter;
 
 /**
@@ -11,7 +11,10 @@ import lombok.Getter;
 @Getter
 public class ChatSession {
     private final String sessionId;
+
+    /** 会话所属用户：微服务口径下由 {@code MessageChannel#getUser()} 提供（网关注入的信任头） */
     private final UserPrincipal user;
+
     private boolean firstChat;
 
     /**

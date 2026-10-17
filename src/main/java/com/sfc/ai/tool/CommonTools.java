@@ -1,34 +1,32 @@
 package com.sfc.ai.tool;
 
-import com.sfc.cloud.constant.SfcUserConstants;
-import com.xiaotao.saltedfishcloud.model.po.file.FileInfo;
-import com.xiaotao.saltedfishcloud.service.file.DiskFileSystemManager;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
-import org.springframework.beans.factory.annotation.Autowired;
 
-import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Stream;
 
 /**
  * 计算器工具集，提供基本的数学运算工具作为 AI tool call 示例。
  */
 public class CommonTools {
-    @Autowired
-    private DiskFileSystemManager diskFileSystemManager;
 
     /**
      * 获取当前时间
+     *
+     * @return 当前时间的字符串表示（ISO-8601 格式）
      */
     @Tool(name = "get_now_time", description = "获取当前时间")
     public String getNowTime() {
         return LocalDateTime.now().toString();
     }
 
+    /**
+     * 让 AI 等待指定的毫秒数
+     *
+     * @param milliseconds 等待的毫秒数
+     * @return 固定返回 "ok"，等待过程被中断时返回中断异常消息
+     */
     @Tool(name = "sleep", description = "让 AI 等待指定的毫秒数")
     public String sleep(@ToolParam(description = "等待的毫秒") long milliseconds) {
         try {

@@ -6,7 +6,7 @@ import com.sfc.ai.core.message.ReasoningAssistantMessage;
 import com.sfc.ai.core.message.ReasoningContentSupport;
 import com.sfc.ai.model.po.AiChatMemory;
 import com.sfc.ai.repo.AiChatMemoryRepo;
-import com.sfc.cloud.utils.SfcMapperHolder;
+import com.sfc.common.utils.SfcMapperHolder;
 import org.jspecify.annotations.NonNull;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.messages.*;

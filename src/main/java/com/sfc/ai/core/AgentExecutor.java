@@ -18,8 +18,8 @@ import com.sfc.ai.model.chat.payload.ToolCallAckPayload;
 import com.sfc.ai.model.chat.message.UserRequest;
 import com.sfc.ai.service.AiConversationService;
 import com.sfc.ai.service.SensitiveToolCallRecordService;
-import com.sfc.cloud.exception.SfcJsonException;
-import com.sfc.cloud.utils.SfcMapperHolder;
+import com.sfc.common.exception.SfcJsonException;
+import com.sfc.common.utils.SfcMapperHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.ToolCallback;
 

@@ -1,17 +1,19 @@
 package com.sfc.ai.core.channel;
 
+import com.sfc.ai.config.SfcUidHandshakeInterceptor;
 import com.sfc.ai.constant.LlmMessageType;
+import com.sfc.ai.identity.SfcCurrentUserSupport;
 import com.sfc.ai.model.chat.message.LlmResponse;
 import com.sfc.ai.model.chat.message.UserRequest;
 import com.sfc.ai.model.chat.payload.ErrorPayload;
-import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
-import com.sfc.cloud.utils.SfcMapperHolder;
+import com.sfc.common.model.UserPrincipal;
+import com.sfc.common.utils.SfcMapperHolder;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
+import java.security.Principal;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
@@ -95,13 +97,42 @@ public class WebSocketMessageChannel implements MessageChannel {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p><b>微服务口径的身份来源：</b>原插件期从 Spring Security 的
+     * {@code UsernamePasswordAuthenticationToken} 取用户；本服务没有 Spring Security，
+     * 身份只来自网关在<b>握手请求</b>上注入的信任头 {@code X-Sfc-Uid}。</p>
+     *
+     * <p>为什么读握手头而不是请求上下文：WebSocket 只有握手那一刻是普通 HTTP 请求
+     * （网关注入信任头、{@code RequestContextHolder} 可用），此后每条消息都跑在
+     * 独立的容器线程上、没有请求上下文；唯一随连接存活的身份载体就是
+     * {@link WebSocketSession#getHandshakeHeaders()}。</p>
+     *
+     * <p>降级：握手头缺失 / 为匿名 {@code "0"} / 非法时返回 {@code null}（等同原实现的
+     * 「无法认证」），username 与 admin 另经用户档案回源补齐，取不到时为占位用户名 + 非管理员。</p>
+     *
+     * @return 当前连接的用户主体；无法确定身份时返回 {@code null}
+     */
     @Override
     public UserPrincipal getUser() {
-        if (session.getPrincipal() instanceof UsernamePasswordAuthenticationToken token
-                && token.getPrincipal() instanceof UserPrincipal user) {
+        // 首选：握手拦截器（SfcUidHandshakeInterceptor）在握手那一刻直接读原始 ServerHttpRequest
+        // 写入的会话属性。这是最可靠的一路——它对「自定义头未进入 HandshakeHeaders」的容器/网关
+        // 差异还有一层 ServletServerHttpRequest 回退。
+        Object snapshotUid = session.getAttributes().get(SfcUidHandshakeInterceptor.ATTR_UID);
+        if (snapshotUid instanceof String rawUid) {
+            UserPrincipal fromSnapshot =
+                    SfcCurrentUserSupport.resolveUser(SfcCurrentUserSupport.parseUidHeader(rawUid));
+            if (fromSnapshot != null) {
+                return fromSnapshot;
+            }
+        }
+        // 兜底：握手头随连接存活，是唯一随连接存活的身份载体；即使拦截器未生效也能工作。
+        Principal principal = session.getPrincipal();
+        if (principal instanceof UserPrincipal user) {
             return user;
         }
-        return null;
+        return SfcCurrentUserSupport.resolveUserFromHeaders(session.getHandshakeHeaders());
     }
 
     private void tryDrain() {

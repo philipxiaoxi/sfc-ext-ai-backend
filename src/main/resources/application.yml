@@ -1,3 +1,40 @@
+server:
+  port: 8091
+
+spring:
+  application:
+    # 注册到 Nacos 的服务名（网关按此做 lb:// 转发）
+    name: sfc-ai-service
+
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+        group: SFC
+        namespace: ""
+        # 临时实例：客户端心跳续约，停服后实例自动消失
+        ephemeral: true
+        metadata:
+          sfc.plugin.info: /api/meta/pluginInfo
+  datasource:
+    driver-class-name: org.sqlite.JDBC
+    url: "jdbc:sqlite:./ai.db"
+  jpa:
+    # default = 由 Hibernate 自行探测方言（SQLite 方言来自 hibernate-community-dialects）
+    database: default
+    open-in-view: false
+    hibernate:
+      # 本服务自己的表由本服务负责建/更新
+      ddl-auto: update
+    properties:
+      hibernate:
+        order_inserts: true
+        jdbc:
+          batch_size: 200
+sfc:
+  internal:
+    key: ${SFC_INTERNAL_KEY:}
+
 logging:
   level:
     # 将消息聚合器的日志级别提高到 WARN 或 OFF，阻止其在控制台疯狂刷 ERROR

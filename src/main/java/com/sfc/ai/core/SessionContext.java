@@ -1,7 +1,7 @@
 package com.sfc.ai.core;
 
 import com.sfc.ai.model.chat.session.ChatSession;
-import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
+import com.sfc.common.model.UserPrincipal;
 import lombok.Getter;
 import lombok.Setter;
 import reactor.core.Disposable;

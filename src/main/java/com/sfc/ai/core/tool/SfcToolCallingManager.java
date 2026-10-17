@@ -4,7 +4,7 @@ import com.sfc.ai.constant.LlmMessageType;
 import com.sfc.ai.core.ToolExecutionManager;
 import com.sfc.ai.core.channel.MessageChannel;
 import com.sfc.ai.model.chat.payload.ToolCallStartPayload;
-import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
+import com.sfc.common.model.UserPrincipal;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -93,7 +93,7 @@ public class SfcToolCallingManager implements ToolCallingManager {
      * @param toolExecutionExceptionProcessor 工具执行异常处理器，将异常转换为回传 LLM 的字符串
      * @param executionManager               工具执行管理器，负责实际执行单次工具调用并发送 END
      * @param channel                        消息通道，用于发送 TOOL_CALL_START
-     * @param user                           当前用户，用于绑定 Spring Security 上下文；可为 null
+     * @param user                           当前用户，用于绑定到工具执行线程的身份上下文（{@code SfcCurrentUserSupport}）；可为 null
      * @param sensitiveToolRegistry          敏感工具注册表
      * @param pendingOps                     待批准的操作列表
      * @param fullAuthMode                   是否完全授权模式，开启后敏感工具直接执行无需用户批准

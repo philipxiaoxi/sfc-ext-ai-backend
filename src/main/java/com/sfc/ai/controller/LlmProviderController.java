@@ -1,13 +1,14 @@
 package com.sfc.ai.controller;
 
+import com.sfc.ai.identity.SfcCurrentUserSupport;
 import com.sfc.ai.model.po.LlmProvider;
 import com.sfc.ai.service.LlmProviderService;
-import com.sfc.cloud.constant.SfcCommonError;
-import com.sfc.cloud.exception.SfcJsonException;
-import com.sfc.cloud.model.json.SfcJsonResult;
-import com.xiaotao.saltedfishcloud.utils.SecureUtils;
+import com.sfc.common.constant.SfcCommonError;
+import com.sfc.common.exception.SfcJsonException;
+import com.sfc.common.model.json.SfcJsonResult;
 import com.sfc.cloud.data.validation.SfcUIDValidator;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -25,7 +26,7 @@ public class LlmProviderController {
      */
     @GetMapping("list")
     public SfcJsonResult<?> list() {
-        Long uid = SecureUtils.getCurrentUid();
+        Long uid = SfcCurrentUserSupport.getCurrentUid();
         return SfcJsonResult.getInstance(llmProviderService.findByUid(uid));
     }
 
@@ -56,7 +57,7 @@ public class LlmProviderController {
             }
         }
         if (provider.getUid() == null) {
-            provider.setUid(SecureUtils.getCurrentUid());
+            provider.setUid(SfcCurrentUserSupport.getCurrentUid());
         }
         llmProviderService.save(provider);
         return SfcJsonResult.getInstance(provider);

@@ -3,7 +3,7 @@ package com.sfc.ai.core.advisor;
 import com.sfc.ai.core.adapter.LlmChatAdapter;
 import com.sfc.ai.core.memory.ChatMemoryRepairer;
 import com.sfc.ai.core.message.ReasoningAssistantMessage;
-import com.sfc.cloud.utils.SfcStringUtils;
+import com.sfc.common.utils.SfcStringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.ai.chat.client.ChatClientRequest;

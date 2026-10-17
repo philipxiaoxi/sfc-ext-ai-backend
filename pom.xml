@@ -1,31 +1,102 @@
 <?xml version="1.0" encoding="UTF-8"?>
+
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+
+    <!--
+        ⚠️ 本模块原为宿主插件 sfc-ext/sfc-ext-ai（parent = sfc-ext，依赖 sfc-core，以 plugin-lib 形态被 Merge 加载）。
+        Phase 2 把它连同自己的独立 git 仓库一起搬到 microservices/ 下，改造为**独立微服务**：
+          · 不再继承宿主根 pom（父 POM 是本目录的 microservices 聚合器，Spring Boot 4.0.8 基线）
+          · 不再有 maven-dependency-plugin / plugin-lib（那是插件加载形态才需要的）
+          · 零宿主依赖：仓库内只允许引用 com.sfc.cloud:* 的共享库
+    -->
     <parent>
-        <artifactId>sfc-ext</artifactId>
-        <groupId>com.xiaotao</groupId>
-        <version>${revision}</version>
+        <groupId>com.sfc.cloud</groupId>
+        <artifactId>microservices</artifactId>
+        <version>1.0.0</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <groupId>com.sfc</groupId>
-    <artifactId>sfc-ext-ai</artifactId>
-    <version>1.0.0</version>
-    <packaging>jar</packaging>
+    <artifactId>sfc-ai-service</artifactId>
+    <name>sfc-ai-service</name>
+    <description>咸鱼云 AI 助手微服务（原 sfc-ext-ai 插件）</description>
 
     <properties>
-        <maven.compiler.source>25</maven.compiler.source>
-        <maven.compiler.target>25</maven.compiler.target>
+        <!-- 共享库版本：本 pom 不继承根 pom，故不能引用根 pom 的 sfc.common.version -->
+        <sfc.common.version>1.0.0</sfc.common.version>
+        <spring-ai.version>2.0.0</spring-ai.version>
     </properties>
 
     <dependencies>
+        <!-- ============ 仓库内共享库（唯一允许的仓库内依赖） ============ -->
+        <!-- 响应信封 / 异常 / 常量 / 工具：SfcJsonResult、SfcJsonException、SfcStringUtils… -->
+        <dependency>
+            <groupId>com.sfc.cloud</groupId>
+            <artifactId>sfc-common</artifactId>
+            <version>${sfc.common.version}</version>
+        </dependency>
+        <!-- JPA 基座：SfcBaseModel→SfcAuditModel、SfcBaseRepo、SfcCrudService(Impl)、雪花主键、@SfcUID -->
+        <dependency>
+            <groupId>com.sfc.cloud</groupId>
+            <artifactId>sfc-common-data</artifactId>
+            <version>${sfc.common.version}</version>
+        </dependency>
+        <!-- 调用 sfc-core 内部网盘接口的 Feign SDK；间接带入 sfc-auth（服务间内部鉴权） -->
+        <dependency>
+            <groupId>com.sfc.cloud</groupId>
+            <artifactId>sfc-remote-client</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- ============ 注册发现 ============ -->
+        <!-- 与宿主/网关同 group=SFC、namespace=""（空串） -->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+        </dependency>
+
+        <!-- ============ Web / WebSocket ============ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+        <!--
+            SfcUIDValidator 实现了 jakarta.validation.ConstraintValidator，类加载即需要校验 API；
+            sfc-common-data 里它声明为 provided（不传递），故此处显式引入实现。
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- ============ 独立数据源：本服务自己的 SQLite ============ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+        </dependency>
+        <!-- Hibernate 的 SQLite 方言在此包中（与宿主同款做法） -->
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-community-dialects</artifactId>
+        </dependency>
+
+        <!-- ============ Spring AI（沿用插件期的版本基线） ============ -->
         <!-- DeepSeek 模型支持 -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-deepseek</artifactId>
         </dependency>
-        <!-- 核心 OpenAI 模型支持（不包含自动配置，用户将手动构造客户端） -->
+        <!-- 核心 OpenAI 模型支持（不含自动配置，由本服务手动构造客户端） -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-openai</artifactId>
@@ -35,12 +106,10 @@
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-client-chat</artifactId>
         </dependency>
-        <!-- WebClient 运行时依赖（spring-ai-deepseek 需要，但宿主 sfc-core 不提供 spring-webflux） -->
+        <!-- WebClient 运行期依赖（spring-ai-deepseek 需要；本服务是 Servlet 应用，只需要 WebClient 这一块） -->
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-webflux</artifactId>
-            <version>7.0.8</version>
-            <scope>runtime</scope>
         </dependency>
         <!-- openai-java-core 使用 Kotlin，需要 Kotlin 反射支持 -->
         <dependency>
@@ -50,52 +119,26 @@
     </dependencies>
 
     <dependencyManagement>
-    <dependencies>
+        <dependencies>
+            <!-- Spring AI 版本列车：只在需要它的本模块内导入，不污染其它微服务 -->
             <dependency>
                 <groupId>org.springframework.ai</groupId>
                 <artifactId>spring-ai-bom</artifactId>
-                <version>2.0.0</version>
+                <version>${spring-ai.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>com.xiaotao</groupId>
-                <artifactId>sfc-core</artifactId>
-                <version>${revision}</version>
-                <scope>provided</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>
 
     <build>
         <plugins>
+            <!-- 打出可执行 jar，便于以 java -jar 形态独立运行 -->
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>copy-dependencies</id>
-                        <configuration>
-                            <!-- 宿主 sfc-core 已提供的依赖，无需打包到 plugin-lib -->
-                            <excludeGroupIds>com.fasterxml.jackson.core,com.fasterxml.jackson.datatype,com.fasterxml.jackson.dataformat,com.fasterxml.jackson.module</excludeGroupIds>
-                            <excludeArtifactIds>
-                                spring-boot-starter-jackson,
-                                spring-boot-jackson,
-                                jackson-core,
-                                jackson-databind,
-                                kotlin-stdlib,
-                                jspecify,
-                                micrometer-commons,
-                                micrometer-observation,
-                                antlr4-runtime,
-                                error_prone_annotations,
-                                swagger-annotations-jakarta,
-                                kotlin-reflect
-                            </excludeArtifactIds>
-                        </configuration>
-                    </execution>
-                </executions>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
         </plugins>
     </build>
+
 </project>

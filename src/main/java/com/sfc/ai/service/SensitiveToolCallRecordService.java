@@ -2,7 +2,7 @@ package com.sfc.ai.service;
 
 import com.sfc.ai.model.param.SensitiveToolCallQueryParam;
 import com.sfc.ai.model.po.SensitiveToolCallRecord;
-import com.sfc.cloud.model.SfcPageInfo;
+import com.sfc.common.model.SfcPageInfo;
 import com.sfc.cloud.data.service.SfcCrudService;
 
 /**

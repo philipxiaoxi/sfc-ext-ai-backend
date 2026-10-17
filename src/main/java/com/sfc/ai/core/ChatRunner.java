@@ -8,12 +8,13 @@ import com.sfc.ai.core.tool.PendingApproval;
 import com.sfc.ai.core.tool.SensitiveToolRegistry;
 import com.sfc.ai.core.tool.SfcToolCallingManager;
 import com.sfc.ai.core.tool.ToolProvider;
+import com.sfc.ai.identity.SfcCurrentUserSupport;
 import com.sfc.ai.model.chat.message.LlmResponse;
 import com.sfc.ai.model.chat.payload.ChatPayload;
 import com.sfc.ai.model.chat.payload.DonePayload;
 import com.sfc.ai.model.chat.payload.TextPayload;
-import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
-import com.sfc.cloud.utils.SfcStringUtils;
+import com.sfc.common.model.UserPrincipal;
+import com.sfc.common.utils.SfcStringUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -107,9 +108,10 @@ public class ChatRunner {
         sessionContext.startChat();
 
         // 6. 订阅流（与原 AgentExecutor.handleChat 顺序 1:1 平移，不重排算子）
+        // 用户名经 SfcCurrentUserSupport 取展示名：微服务侧身份只有 uid 时不会 NPE，退化为 "uid:<id>"
         sessionContext.setDisposable(chatClient.prompt(Prompt.builder()
                         .messages(SystemMessage.builder()
-                                .text(SYSTEM_PROMPT_PREFIX + sessionContext.getUser().getUsername())
+                                .text(SYSTEM_PROMPT_PREFIX + SfcCurrentUserSupport.displayName(sessionContext.getUser()))
                                 .build())
                         .build())
                 .user(chatData.getContent())

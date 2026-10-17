@@ -1,12 +1,12 @@
 package com.sfc.ai.controller;
 
+import com.sfc.ai.identity.SfcCurrentUserSupport;
 import com.sfc.ai.model.po.AiConversation;
 import com.sfc.ai.model.vo.ConversationHistoryVo;
 import com.sfc.ai.service.AiConversationService;
-import com.sfc.cloud.exception.SfcJsonException;
-import com.sfc.cloud.model.json.SfcJsonResult;
 import com.sfc.cloud.data.validation.SfcUIDValidator;
-import com.xiaotao.saltedfishcloud.utils.SecureUtils;
+import com.sfc.common.exception.SfcJsonException;
+import com.sfc.common.model.json.SfcJsonResult;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,7 +30,7 @@ public class AiConversationController {
      */
     @GetMapping("list")
     public SfcJsonResult<List<AiConversation>> list() {
-        Long uid = SecureUtils.getCurrentUid();
+        Long uid = SfcCurrentUserSupport.getCurrentUid();
         return SfcJsonResult.getInstance(aiConversationService.findByUidOrderByUpdateAtDesc(uid));
     }
 

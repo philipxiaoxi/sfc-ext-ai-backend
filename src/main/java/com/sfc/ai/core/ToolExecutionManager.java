@@ -9,14 +9,14 @@ import com.sfc.ai.core.tool.PendingApproval;
 import com.sfc.ai.core.tool.RegisteredTool;
 import com.sfc.ai.core.tool.SensitiveToolRegistry;
 import com.sfc.ai.core.tool.ToolExecution;
+import com.sfc.ai.identity.SfcCurrentUserSupport;
 import com.sfc.ai.model.chat.payload.PermissionRequestPayload;
 import com.sfc.ai.model.chat.payload.ToolCallEndPayload;
 import com.sfc.ai.model.chat.payload.ToolCallStatus;
 import com.sfc.ai.model.po.SensitiveToolCallRecord;
 import com.sfc.ai.service.SensitiveToolCallRecordService;
-import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
-import com.sfc.cloud.utils.SfcMapperHolder;
-import com.xiaotao.saltedfishcloud.utils.SecureUtils;
+import com.sfc.common.model.UserPrincipal;
+import com.sfc.common.utils.SfcMapperHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
@@ -46,7 +46,7 @@ import java.util.concurrent.Future;
  *   <li>待 ACK 的客户端中介工具调用注册表（{@link #pendingToolCalls}）</li>
  *   <li>内建工具虚拟线程执行器</li>
  *   <li>工具取消与确认</li>
- *   <li>单次工具调用执行（{@link #executeToolCall}）：安全上下文绑定、可中断执行、
+ *   <li>单次工具调用执行（{@link #executeToolCall}）：身份上下文绑定（{@link SfcCurrentUserSupport}）、可中断执行、
  *       {@link LlmMessageType#TOOL_CALL_END} 生命周期通知</li>
  * </ul>
  * <p>
@@ -122,7 +122,8 @@ public class ToolExecutionManager {
      * @param toolName    工具名称
      * @param toolInput   工具输入参数（JSON 字符串）
      * @param toolContext            工具上下文
-     * @param user                   当前用户，用于绑定 Spring Security 上下文；可为 null
+     * @param user                   当前用户，用于绑定到工具执行线程的身份上下文
+     *                               （{@link SfcCurrentUserSupport#bind(UserPrincipal)}）；可为 null
      * @param channel                消息通道，用于发送 {@link LlmMessageType#TOOL_CALL_END}
      * @param sensitiveToolRegistry  敏感工具注册表
      * @param pendingOps             待批准的操作列表
@@ -185,12 +186,13 @@ public class ToolExecutionManager {
         Future<String> future = toolExecutor.submit(() -> {
             try {
                 if (user != null) {
-                    SecureUtils.bindUser(user);
+                    // 工具执行在独立虚拟线程上，请求上下文已丢失：显式把身份绑定到本线程
+                    SfcCurrentUserSupport.bind(user);
                 }
                 return callback.call(toolInput, toolContext);
             } finally {
                 if (user != null) {
-                    SecureUtils.unbind();
+                    SfcCurrentUserSupport.unbind();
                 }
             }
         });

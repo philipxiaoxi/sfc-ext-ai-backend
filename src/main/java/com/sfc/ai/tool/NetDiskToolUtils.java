@@ -1,7 +1,7 @@
 package com.sfc.ai.tool;
 
-import com.sfc.cloud.constant.SfcUserConstants;
-import com.xiaotao.saltedfishcloud.utils.SecureUtils;
+import com.sfc.ai.identity.SfcCurrentUserSupport;
+import com.sfc.common.constant.SfcUserConstants;
 import org.springframework.core.io.Resource;
 
 import java.io.InputStream;
@@ -26,7 +26,7 @@ public final class NetDiskToolUtils {
         return switch (disk) {
             case "public" -> SfcUserConstants.PUBLIC_USER_ID;
             case "private" -> {
-                Long uid = SecureUtils.getCurrentUid();
+                Long uid = SfcCurrentUserSupport.getCurrentUid();
                 if (uid == null) {
                     throw new IllegalArgumentException("private 模式需要用户登录");
                 }

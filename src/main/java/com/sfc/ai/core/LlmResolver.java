@@ -6,8 +6,8 @@ import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.model.po.LlmProvider;
 import com.sfc.ai.service.LlmModelService;
 import com.sfc.ai.service.LlmProviderService;
-import com.sfc.cloud.exception.SfcJsonException;
-import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
+import com.sfc.common.exception.SfcJsonException;
+import com.sfc.common.model.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 
 /**

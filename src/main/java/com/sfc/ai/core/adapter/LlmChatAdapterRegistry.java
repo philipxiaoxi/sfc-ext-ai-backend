@@ -1,6 +1,6 @@
 package com.sfc.ai.core.adapter;
 
-import com.sfc.cloud.exception.SfcJsonException;
+import com.sfc.common.exception.SfcJsonException;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.LinkedHashMap;

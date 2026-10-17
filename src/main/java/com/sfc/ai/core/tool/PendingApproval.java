@@ -1,6 +1,6 @@
 package com.sfc.ai.core.tool;
 
-import com.xiaotao.saltedfishcloud.model.po.UserPrincipal;
+import com.sfc.common.model.UserPrincipal;
 import lombok.Data;
 import org.springframework.ai.tool.ToolCallback;
 
@@ -26,7 +26,13 @@ public class PendingApproval {
     private ToolCallback callback;
     private Instant createdAt;
 
-    /** 发起工具调用的用户，批准执行时用于绑定 Spring Security 上下文 */
+    /**
+     * 发起工具调用的用户。
+     *
+     * <p>批准执行时由 {@code ToolExecutionManager} 经
+     * {@code SfcCurrentUserSupport#bind(UserPrincipal)} 绑定到执行线程，
+     * 供工具内部以 {@code SfcCurrentUserSupport#getCurrentUid()} 读取（微服务侧无 Spring Security 上下文）。</p>
+     */
     private UserPrincipal user;
 
     /**

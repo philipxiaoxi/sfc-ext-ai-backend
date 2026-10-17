@@ -1,6 +1,6 @@
 package com.sfc.ai.core.advisor;
 
-import com.sfc.cloud.utils.SfcStringUtils;
+import com.sfc.common.utils.SfcStringUtils;
 import org.jspecify.annotations.NonNull;
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;

@@ -3,6 +3,7 @@ package com.sfc.ai.service;
 import com.sfc.ai.model.po.AiConversation;
 import com.sfc.ai.model.vo.ConversationHistoryVo;
 import com.sfc.cloud.data.service.SfcCrudService;
+import com.sfc.common.exception.SfcJsonException;
 
 import java.util.List;
 
@@ -42,7 +43,7 @@ public interface AiConversationService extends SfcCrudService<AiConversation> {
      *
      * @param conversationId 会话 ID
      * @return 对话历史 VO
-     * @throws com.sfc.cloud.exception.SfcJsonException 若会话不存在
+     * @throws SfcJsonException 若会话不存在
      */
     ConversationHistoryVo getConversationMessages(String conversationId);
 }

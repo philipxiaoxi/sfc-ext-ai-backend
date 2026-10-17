@@ -26,6 +26,10 @@ public class AiWebSocketConfig implements WebSocketConfigurer {
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(aiChatWebSocketHandler, "/api/ai/wschat")
+                // ⚠️ 必须挂握手拦截器：微服务侧没有 Spring Security，WS 会话的 Principal 为空，
+                //    且消息回调线程没有 HTTP 请求上下文；只能在【握手时】把网关注入的 X-Sfc-Uid
+                //    快照进会话属性，否则会话内拿不到用户（详见 SfcUidHandshakeInterceptor 的类注释）。
+                .addInterceptors(new SfcUidHandshakeInterceptor())
                 .setAllowedOriginPatterns("*");
     }
 }

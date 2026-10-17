@@ -1,13 +1,13 @@
 package com.sfc.ai.controller;
 
+import com.sfc.ai.identity.SfcCurrentUserSupport;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.model.po.LlmProvider;
 import com.sfc.ai.model.vo.ProviderVo;
 import com.sfc.ai.model.vo.ProviderWithModelsVo;
 import com.sfc.ai.service.LlmModelService;
 import com.sfc.ai.service.LlmProviderService;
-import com.sfc.cloud.model.json.SfcJsonResult;
-import com.xiaotao.saltedfishcloud.utils.SecureUtils;
+import com.sfc.common.model.json.SfcJsonResult;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -39,7 +39,7 @@ public class LlmQueryController {
      */
     @GetMapping("providersWithModels")
     public SfcJsonResult<List<ProviderWithModelsVo>> getProvidersWithModels() {
-        Long currentUid = SecureUtils.getCurrentUid();
+        Long currentUid = SfcCurrentUserSupport.getCurrentUid();
 
         List<Long> uids = new ArrayList<>();
         uids.add(0L);

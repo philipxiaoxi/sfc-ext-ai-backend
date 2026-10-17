@@ -3,7 +3,7 @@ package com.sfc.ai.core.adapter;
 import com.sfc.ai.core.message.ReasoningContentSupport;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.model.po.LlmProvider;
-import com.sfc.cloud.utils.SfcStringUtils;
+import com.sfc.common.utils.SfcStringUtils;
 import org.jspecify.annotations.Nullable;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
