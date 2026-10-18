@@ -6,6 +6,7 @@ import com.sfc.cloud.remote.client.SfcCoreFileClient;
 import com.sfc.cloud.model.SfcFileInfo;
 import com.sfc.common.utils.SfcStringUtils;
 import feign.Response;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +42,7 @@ import java.util.regex.Pattern;
  *       例如不再包含 {@code createAt}/{@code updateAt}），递归搜索改为逐目录远程列举。</li>
  * </ul>
  */
+@Slf4j
 public class NetDiskTools {
 
     /** 文本文件远程读取的最大字节数（4 MiB），超出后直接失败，避免整体下载把微服务内存打爆 */
@@ -194,6 +196,7 @@ public class NetDiskTools {
             fileClient.delete(uid, path, Collections.singletonList(name)).getDataOrThrow();
             return "删除成功";
         } catch (Exception e) {
+            log.error("[AI Tool Call]调用删除文件{}:{}失败", disk, path, e);
             return "删除失败: " + e.getMessage();
         }
     }
