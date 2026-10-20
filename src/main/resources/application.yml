@@ -2,10 +2,15 @@ server:
   port: 8091
 
 spring:
+  servlet:
+    encoding:
+      charset: utf-8
+      force: true
+      enabled: true
   application:
-    # 注册到 Nacos 的服务名（网关按此做 lb:// 转发）
     name: sfc-ai-service
-
+  mvc:
+    static-path-pattern: "/static/**"
   cloud:
     nacos:
       discovery:
@@ -16,6 +21,7 @@ spring:
         ephemeral: true
         metadata:
           sfc.plugin.info: /api/meta/pluginInfo
+          sfc.plugin.autoload: /static/index.umd.js,/static/style.css
   datasource:
     driver-class-name: org.sqlite.JDBC
     url: "jdbc:sqlite:./ai.db"
