@@ -12,8 +12,16 @@ spring:
   mvc:
     static-path-pattern: "/static/**"
   cloud:
+    sfc-local:
+      enabled: false
+      server-addr: "localhost:8087"
+      password: 114514
+      metadata:
+        sfc.plugin.info: /api/meta/pluginInfo
+        sfc.plugin.autoload: /static/index.umd.js,/static/style.css
     nacos:
       discovery:
+        enabled: true
         server-addr: 127.0.0.1:8848
         group: SFC
         namespace: ""
