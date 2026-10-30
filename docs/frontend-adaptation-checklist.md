@@ -78,7 +78,7 @@ core 也不再加载本插件，因此：
 | Nacos | `127.0.0.1:8848` 已启动 |
 | `sfc-core` | 已启动并注册；group=`SFC`、namespace=空串 |
 | `sfc-ai-service` | 已启动（`8091`）并注册；**同上 group/namespace**，否则「注册成功但互相看不见」 |
-| `sfc-gateway` | 已启动；`SFC_JWT_SECRET` 必须注入为 core 的会话密钥（`sys.safe.token`），否则网关**启动即失败** |
+| `sfc-gateway` | 已启动；`SFC_JWT_SECRET` 必须注入为 core 的 JWT 会话密钥（core 配置项 `sys.jwt-secret`，两侧同一值且恰好 32 字符），否则 core / 网关**启动即失败** |
 | `SFC_INTERNAL_KEY` | **core 与 AI 服务必须配置同一份**：AI 服务调 core 的 `/api/internal/**` 靠它自签凭证；core 侧没配则内部接口一律 403（fail-closed） |
 | 浏览器访问 | 只访问网关地址，不要直连 `8087` / `8091` |
 
