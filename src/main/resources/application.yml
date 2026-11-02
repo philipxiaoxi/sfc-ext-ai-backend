@@ -18,15 +18,16 @@ spring:
   #            NACOS_SERVER_ADDR / NACOS_GROUP / NACOS_NAMESPACE / NACOS_USERNAME / NACOS_PASSWORD
   cloud:
     sfc-local:
-      # local 注册中心客户端：服务端由 sfc-core 进程内注册表 + /api/local-registry/** 提供
-      enabled: ${SFC_LOCAL_ENABLED:true}
-      server-addr: "${SFC_LOCAL_REGISTRY_ADDR:localhost:8087}"
-      password: "${SFC_LOCAL_REGISTRY_PASSWORD:114514}"
-      # 注册到注册中心的 host；留空 = 自动探测（容器内即容器 IP，与 core 同网络时可直接访问）
-      host: "${SFC_LOCAL_REGISTRY_HOST:}"
-      metadata:
-        sfc.plugin.info: /api/meta/pluginInfo
-        sfc.plugin.autoload: /static/index.umd.js,/static/style.css
+      discovery:
+        # local 注册中心客户端：服务端由 sfc-core 进程内注册表 + /api/local-registry/** 提供
+        enabled: ${SFC_LOCAL_ENABLED:true}
+        server-addr: "${SFC_LOCAL_REGISTRY_ADDR:localhost:8087}"
+        password: "${SFC_LOCAL_REGISTRY_PASSWORD:114514}"
+        # 注册到注册中心的 host；留空 = 自动探测（容器内即容器 IP，与 core 同网络时可直接访问）
+        host: "${SFC_LOCAL_REGISTRY_HOST:}"
+        metadata:
+          sfc.plugin.info: /api/meta/pluginInfo
+          sfc.plugin.autoload: /static/index.umd.js,/static/style.css
     nacos:
       discovery:
         enabled: ${NACOS_ENABLED:false}
