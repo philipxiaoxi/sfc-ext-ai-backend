@@ -45,6 +45,7 @@ public class DeepSeekChatAdapter implements LlmChatAdapter {
 
                 .headers(
                         Optional.ofNullable(provider.getCustomHeader())
+                                .filter(SfcStringUtils::hasText)
                                 .map(h -> {
                                     HttpHeaders httpHeaders = new HttpHeaders();
                                     try {

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.model.po.LlmProvider;
 import com.sfc.common.utils.SfcMapperHolder;
+import com.sfc.common.utils.SfcStringUtils;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
@@ -35,6 +36,7 @@ public class OpenAiChatAdapter implements LlmChatAdapter {
                         .model(model.getModelId())
                         .customHeaders(
                                 Optional.ofNullable(provider.getCustomHeader())
+                                        .filter(SfcStringUtils::hasText)
                                         .map(h -> {
                                             try {
                                                 return SfcMapperHolder.mapper.readValue(h, new TypeReference<Map<String, String>>(){});
