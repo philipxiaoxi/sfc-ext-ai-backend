@@ -4,6 +4,7 @@ import com.sfc.ai.annotation.SensitiveTool;
 import com.sfc.common.exception.SfcJsonException;
 import com.sfc.cloud.remote.client.SfcCoreFileClient;
 import com.sfc.cloud.model.SfcFileInfo;
+import com.sfc.common.model.SfcPageInfo;
 import com.sfc.common.utils.SfcStringUtils;
 import feign.Response;
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +31,7 @@ import java.util.regex.Pattern;
  *
  * <p><b>微服务化改造说明：</b>本类原先在宿主进程内直接调用 {@code DiskFileSystem}，改造后统一改为通过
  * {@link SfcCoreFileClient}（OpenFeign）远程回调 sfc-core 的内部接口 {@code /api/internal/file/v2}，
- * 本服务不再持有任何宿主实现类的引用。对外的方法名与返回结构保持不变。</p>
+ * 本服务不再持有任何宿主实现类的引用。对外的方法名保持不变。</p>
  *
  * <p><b>与宿主实现的语义差异</b>（远程接口无法覆盖的能力，详见各类方法的说明）：</p>
  * <ul>
@@ -60,7 +61,7 @@ public class NetDiskTools {
     /** {@code search_files} 工具返回结果条数的默认值 */
     private static final int DEFAULT_SEARCH_MAX_RESULTS = 10;
 
-    /** {@code search_files} 工具返回结果条数上限，超出上限时按上限截断 */
+    /** {@code list_files} 每页条数与 {@code search_files} 返回结果条数共用的上限，超出上限时按上限截断 */
     private static final int MAX_RESULTS_SIZE = 50;
 
     /**
@@ -93,53 +94,60 @@ public class NetDiskTools {
      * <p>远程化说明：原实现依赖宿主的 {@code DiskFileSystemUtils#walk} 进程内遍历，现改为逐目录调用
      * {@link SfcCoreFileClient#list} 的广度优先遍历；起始路径本身就是文件时只处理该文件（与宿主遍历器一致）。</p>
      *
+     * <p>分页说明：{@code maxResults} 既是单次返回结果条数的上限，也用作总页数的换算依据；
+     * 为统计命中总条数，命中数达到 {@code maxResults} 后仍会继续遍历剩余目录（只计数、不再收集）。</p>
+     *
      * @param disk       网盘类型，"public" 或 "private"
      * @param path       搜索的起始目录路径，以字符 '/' 开头和作为分隔符
      * @param regex      文件名正则表达式，如 ".*\\.txt" 匹配所有 txt 文件
-     * @param maxResults 最大返回结果条数，默认 {@value #DEFAULT_SEARCH_MAX_RESULTS}，最大 {@value #MAX_RESULTS_SIZE}
-     * @return 文件搜索结果列表，包含网盘类型、完整路径、文件大小和文件名
+     * @param maxResults 最大返回结果条数（每页条数），默认 {@value #DEFAULT_SEARCH_MAX_RESULTS}，最大 {@value #MAX_RESULTS_SIZE}
+     * @return 分页搜索结果，包含当前返回的结果列表、命中总条数与总页数
      * @throws IOException 远程列举目录失败时抛出（保持原方法签名）
      */
-    @Tool(name = "search_files", description = "在网盘中搜索文件，支持递归子目录和文件名正则匹配，返回条数默认20、最大200")
-    public List<FileSearchResult> searchFiles(
+    @Tool(name = "search_files", description = "在网盘中搜索文件，支持递归子目录和文件名正则匹配，返回结果列表、命中总条数与总页数（maxResults 默认"
+            + DEFAULT_SEARCH_MAX_RESULTS + "、最大" + MAX_RESULTS_SIZE + "）")
+    public SfcPageInfo<FileSearchResult> searchFiles(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "搜索的起始目录路径，以 '/' 开头和作为分隔符") String path,
             @ToolParam(description = "文件名正则表达式，如 '.*\\\\.txt' 匹配所有 txt 文件") String regex,
-            @ToolParam(description = "最大返回结果条数，默认" + DEFAULT_LIST_PAGE_SIZE + "、最大" + MAX_RESULTS_SIZE, required = false) Integer maxResults) throws IOException {
+            @ToolParam(description = "最大返回结果条数（每页条数），默认" + DEFAULT_SEARCH_MAX_RESULTS
+                    + "、最大" + MAX_RESULTS_SIZE, required = false) Integer maxResults) throws IOException {
         long uid = NetDiskToolUtils.resolveUid(disk);
         Pattern pattern = Pattern.compile(regex);
         List<FileSearchResult> results = new ArrayList<>();
         int max = resolveSearchMaxResults(maxResults);
+        long totalCount = 0L;
 
         // 起始路径可能直接指向一个文件（宿主 walk 的 isFile 分支语义），此时只处理该文件
         SfcFileInfo singleFile = statFile(uid, path);
         if (singleFile != null) {
-            if (results.size() < max && pattern.matcher(singleFile.getName()).matches()) {
+            if (pattern.matcher(singleFile.getName()).matches()) {
+                totalCount = 1L;
                 results.add(new FileSearchResult(disk, path, singleFile.getSize(), singleFile.getName()));
             }
-            return results;
+            return toPageInfo(results, totalCount, max);
         }
 
         Deque<String> dirQueue = new ArrayDeque<>();
         dirQueue.add(path);
-        while (!dirQueue.isEmpty() && results.size() < max) {
+        while (!dirQueue.isEmpty()) {
             String currentPath = dirQueue.poll();
             for (SfcFileInfo entry : listOrThrow(uid, currentPath)) {
                 if (entry.isDir()) {
                     dirQueue.add(SfcStringUtils.appendPath(currentPath, entry.getName()));
                     continue;
                 }
-                if (results.size() >= max) {
-                    break;
-                }
                 if (pattern.matcher(entry.getName()).matches()) {
-                    results.add(new FileSearchResult(disk, SfcStringUtils.appendPath(currentPath, entry.getName()),
-                            entry.getSize(), entry.getName()));
+                    totalCount++;
+                    if (results.size() < max) {
+                        results.add(new FileSearchResult(disk, SfcStringUtils.appendPath(currentPath, entry.getName()),
+                                entry.getSize(), entry.getName()));
+                    }
                 }
             }
         }
 
-        return results;
+        return toPageInfo(results, totalCount, max);
     }
 
     /**
@@ -151,31 +159,33 @@ public class NetDiskTools {
      *
      * <p>分页说明：core 的列举接口本身不支持分页，因此先取回完整列表再按分页参数截取。{@code pageSize}
      * 缺省为 {@value #DEFAULT_LIST_PAGE_SIZE}、上限 {@value #MAX_RESULTS_SIZE}；{@code offset} 与
-     * {@code page} 均从 0 开始，同时指定时以 {@code page} 为准；页码或偏移量超出列表长度时返回空列表。</p>
+     * {@code page} 均从 0 开始，同时指定时以 {@code page} 为准；页码或偏移量超出列表长度时返回空内容。</p>
      *
      * @param disk     网盘类型，"public" 或 "private"
      * @param path     目录路径，以字符 '/' 开头和作为分隔符
      * @param offset   起始偏移量（从0开始），与 page 二选一，同时指定时以 page 为准；可为 null
      * @param page     页码（从0开始），与 offset 二选一，同时指定时以 page 为准；可为 null
      * @param pageSize 每页条数，缺省 {@value #DEFAULT_LIST_PAGE_SIZE}，最大 {@value #MAX_RESULTS_SIZE}；可为 null
-     * @return 当前分页内的文件和目录列表（目录在前）
+     * @return 分页结果，包含当前页的文件和目录列表（目录在前）、总条数与总页数
      * @throws IOException 远程列举目录失败时抛出（保持原方法签名）
      */
-    @Tool(name = "list_files", description = "分页列出网盘文件列表（目录在前）：offset/page 从0开始且同时指定时以 page 为准，pageSize 默认20、最大200")
-    public List<SfcFileInfo> listFiles(
+    @Tool(name = "list_files", description = "分页列出网盘文件列表（目录在前），返回当前页内容、总条数与总页数（offset/page 从0开始且同时指定时以 page 为准，pageSize 默认"
+            + DEFAULT_LIST_PAGE_SIZE + "、最大" + MAX_RESULTS_SIZE + "）")
+    public SfcPageInfo<SfcFileInfo> listFiles(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "查询的网盘路径，以字符 '/' 开头和作为分隔符") String path,
             @ToolParam(description = "起始偏移量（从0开始），与 page 二选一，同时指定时以 page 为准", required = false) Integer offset,
             @ToolParam(description = "页码（从0开始），与 offset 二选一，同时指定时以 page 为准", required = false) Integer page,
-            @ToolParam(description = "每页条数，默认" + DEFAULT_LIST_PAGE_SIZE + "、最大" + MAX_RESULTS_SIZE, required = false) Integer pageSize) throws IOException {
+            @ToolParam(description = "每页条数，默认" + DEFAULT_LIST_PAGE_SIZE
+                    + "、最大" + MAX_RESULTS_SIZE, required = false) Integer pageSize) throws IOException {
         long uid = NetDiskToolUtils.resolveUid(disk);
         List<SfcFileInfo> entries = listOrThrow(uid, path);
         int size = resolveListPageSize(pageSize);
         long start = resolveListOffset(offset, page, size);
-        if (start >= entries.size()) {
-            return Collections.emptyList();
-        }
-        return new ArrayList<>(entries.subList((int) start, (int) Math.min(start + size, entries.size())));
+        List<SfcFileInfo> content = start >= entries.size()
+                ? Collections.emptyList()
+                : new ArrayList<>(entries.subList((int) start, (int) Math.min(start + size, entries.size())));
+        return toPageInfo(content, entries.size(), size);
     }
 
     /**
@@ -667,6 +677,23 @@ public class NetDiskTools {
             return DEFAULT_SEARCH_MAX_RESULTS;
         }
         return Math.clamp(maxResults, 1, MAX_RESULTS_SIZE);
+    }
+
+    /**
+     * 把分页内容包装为带总条数与总页数的分页结果。
+     *
+     * @param content    当前页的内容
+     * @param totalCount 满足条件的总记录数
+     * @param pageSize   每页记录数，需大于 0
+     * @param <T>        内容元素类型
+     * @return 携带当前页内容、总记录数与总页数的分页结果
+     */
+    private static <T> SfcPageInfo<T> toPageInfo(List<T> content, long totalCount, int pageSize) {
+        long totalPage = (totalCount + pageSize - 1) / pageSize;
+        return new SfcPageInfo<T>()
+                .setContent(content)
+                .setTotalCount(totalCount)
+                .setTotalPage(totalPage);
     }
 
     /**
