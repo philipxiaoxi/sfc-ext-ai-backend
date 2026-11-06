@@ -1,8 +1,11 @@
 package com.sfc.ai.core.adapter;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.sfc.ai.core.message.ReasoningContentSupport;
 import com.sfc.ai.model.po.LlmModel;
 import com.sfc.ai.model.po.LlmProvider;
+import com.sfc.common.utils.SfcMapperHolder;
 import com.sfc.common.utils.SfcStringUtils;
 import org.jspecify.annotations.Nullable;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -12,8 +15,12 @@ import org.springframework.ai.deepseek.DeepSeekAssistantMessage;
 import org.springframework.ai.deepseek.DeepSeekChatModel;
 import org.springframework.ai.deepseek.DeepSeekChatOptions;
 import org.springframework.ai.deepseek.api.DeepSeekApi;
+import org.springframework.http.HttpHeaders;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * DeepSeek 适配器，使用 Spring AI 的 {@link DeepSeekChatModel} 创建聊天模型实例。
@@ -35,6 +42,20 @@ public class DeepSeekChatAdapter implements LlmChatAdapter {
         DeepSeekApi deepSeekApi = DeepSeekApi.builder()
                 .apiKey(provider.getApiKey())
                 .baseUrl(provider.getBaseUrl())
+
+                .headers(
+                        Optional.ofNullable(provider.getCustomHeader())
+                                .map(h -> {
+                                    HttpHeaders httpHeaders = new HttpHeaders();
+                                    try {
+                                        SfcMapperHolder.parseJsonToMap(h, String.class, String.class).forEach(httpHeaders::add);
+                                    } catch (JsonProcessingException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                    return httpHeaders;
+                                })
+                                .orElseGet(HttpHeaders::new)
+                )
                 .build();
 
         DeepSeekChatOptions options = DeepSeekChatOptions.builder()
