@@ -356,13 +356,18 @@ public class NetDiskTools {
     public String getDownloadLink(
             @ToolParam(description = "网盘类型，'public' 表示公共网盘，'private' 表示私人网盘") String disk,
             @ToolParam(description = "文件所在的目录路径，以字符 '/' 开头和作为分隔符") String path,
-            @ToolParam(description = "文件名") String name) {
+            @ToolParam(description = "文件名") String name,
+            @ToolParam(description = "让链接是否强制触发浏览器的下载行为而不是打开或预览。该参数为true时创建的链接，会让服务器ContentType响应application/octet-stream", required = false) Boolean download) {
         long uid = NetDiskToolUtils.resolveUid(disk);
-        return UriComponentsBuilder.fromPath(DOWNLOAD_LINK_PATH)
+        UriComponentsBuilder uriComponentsBuilder = UriComponentsBuilder.fromPath(DOWNLOAD_LINK_PATH)
                 .queryParam("protocol", PROTOCOL_MAIN)
                 .queryParam("targetId", String.valueOf(uid))
                 .queryParam("path", path)
-                .queryParam("name", name)
+                .queryParam("name", name);
+        if (Boolean.TRUE.equals(download)) {
+            uriComponentsBuilder.queryParam("download", "1");
+        }
+        return uriComponentsBuilder
                 .encode()
                 .buildAndExpand(uid)
                 .toUriString();
